@@ -96,7 +96,6 @@ cfm_tensor *cfm_tensor_from(cfm_string name, cfm_dtype dtype,
     t->numel = 1;
     for (size_t i = 0; i < t->ndims; ++i) t->numel *= t->shape[i]; 
     cfm_set_tensor_strides(t);
-    size_t element_size = cfm_element_size(dtype);
     t->requires_grad = requires_grad;
     return t;
 }
@@ -159,7 +158,7 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
             }
             break;
         case CFM_V_PRINT:
-            printf("\n");
+            putchar('\n');
             size_t indent = strlen(t->name.content);
             for (size_t i = 0; i < t->numel; ++i) {
                 if (i == t->numel-1) printf("%*s%.*f)\n", (int)indent, "", precision, cfm_tensor_get_element(t, i));
@@ -171,14 +170,41 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
 
 void cfm_tensor_print(const cfm_tensor *t, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
-    // (1, 2, 3, 4, 5, 6)       IN MEMORY, stored row major
-    // [[1, 2, 3], [4, 5, 6]]   IN THIS cfm_tensor IMPLEMENTATION 
-    /* for a shape[2, 3] tensor:
-     *
-     */
-        
-    for (uint64_t i = 0; i < t->numel; ++i) {
+
+    const char *t_name = t->name.content;
+    size_t t_name_len = strlen(t_name);
+    if (t_name_len == 0) cfm_die("strlen error");
+
+    /* Scalar. */
+    if (t->ndims == 0) {
+        printf("%s(%.*f)\n", t_name, precision, cfm_tensor_get_element(t, 0));
+        return;
+    }
+
+    printf("%s(", t_name);
+    for (uint8_t d = 0; d < t->ndims; d++) putchar('[');
+    for (uint64_t i = 0; i < t->numel; i++) {
+        int wrap = 0;
+        for (int d = (int)t->ndims - 1; d >= 0; d--) {
+            // i/strides[d] how many blocks of stride-size have we passed
+            // %shape[d] where we are whitin that block
+            if ((i / t->strides[d]) % t->shape[d] == 0) wrap++;
+            else break;
+        }
+
+        if (i > 0) {
+            if (wrap > 0) {
+                for (int w = 0; w < wrap; w++) putchar(']');
+                int indent = t_name_len + t->ndims - wrap;
+                printf(",\n%*s", indent, "");
+                for (int w = 0; w < wrap; w++) putchar('[');
+            } else {
+                printf(", ");
+            }
+        }
 
         printf("%.*f", precision, cfm_tensor_get_element(t, i));
     }
+    for (uint8_t d = 0; d < t->ndims; d++) putchar(']');
+    printf(")\n");
 }
