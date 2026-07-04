@@ -105,16 +105,19 @@ cfm_tensor *cfm_tensor_rand(cfm_string name, cfm_dtype dtype,
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     CFM_ASSERT(t != NULL);
 
-    if (t->dtype == CFM_FLOAT32) {
-        float *d = t->data;
-        for (size_t i = 0; i < t->numel; ++i) {
-            d[i] = (float)rand()/(float)RAND_MAX;
-        }
-    } else {
-        double *d = t->data;
-        for (size_t i = 0; i < t->numel; ++i) {
-            d[i] = (double)rand()/(double)RAND_MAX;
-        }
+    switch (dtype) {
+        case CFM_FLOAT32:
+            float *f_data = t->data;
+            for (size_t i = 0; i < t->numel; ++i) {
+                f_data[i] = (float)rand()/(float)RAND_MAX;
+            }
+            break;
+        case CFM_FLOAT64:
+            double *d_data = t->data;
+            for (size_t i = 0; i < t->numel; ++i) {
+                d_data[i] = (double)rand()/(double)RAND_MAX;
+            }
+            break;
     }
     return t;
 }
@@ -125,20 +128,23 @@ cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype,
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     CFM_ASSERT(t != NULL);
     
-    if (t->dtype == CFM_FLOAT32) {
-        float *d = t->data;
-        for (size_t i = 0; i < t->numel; ++i) {
-            float u1 = (float)rand()/(float)RAND_MAX;
-            float u2 = (float)rand()/(float)RAND_MAX;
-            d[i] = sqrtf(-2.f*log((float)u1)) * cosf(CFM_2_PI*u2);
-        }
-    } else {
-        double *d = t->data;
-        for (size_t i = 0; i < t->numel; ++i) {
-            double u1 = (double)rand()/(double)RAND_MAX;
-            double u2 = (double)rand()/(double)RAND_MAX;
-            d[i] = sqrt(-2.f*log(u1)) * cos(CFM_2_PI*u2);
-        }
+    switch (dtype) {
+        case CFM_FLOAT32:
+            float *f_data = t->data;
+            for (size_t i = 0; i < t->numel; ++i) {
+                float u1 = (float)rand()/(float)RAND_MAX;
+                float u2 = (float)rand()/(float)RAND_MAX;
+                f_data[i] = sqrtf(-2.f*log((float)u1)) * cosf(CFM_2_PI*u2);
+            }
+            break;
+        case CFM_FLOAT64:
+            double *d_data = t->data;
+            for (size_t i = 0; i < t->numel; ++i) {
+                double u1 = (double)rand()/(double)RAND_MAX;
+                double u2 = (double)rand()/(double)RAND_MAX;
+                d_data[i] = sqrt(-2.f*log(u1)) * cos(CFM_2_PI*u2);
+            }
+            break;
     }
     return t;
 }
@@ -195,7 +201,7 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
         if (i > 0) {
             if (wrap > 0) {
                 for (int w = 0; w < wrap; w++) putchar(']');
-                int indent = t_name_len + t->ndims - wrap;
+                int indent = t_name_len + t->ndims - wrap + 1;
                 printf(",\n%*s", indent, "");
                 for (int w = 0; w < wrap; w++) putchar('[');
             } else {
