@@ -7,8 +7,8 @@
 #define CFM_MAX_DIMS        4
 #define CFM_STRING_MAX_LEN  64
 
-# define M_PI		3.14159265358979323846	/* pi */
-#define _2_PI       6.28318530717958647692  /* pi*2 */
+#define CFM_PI		3.14159265358979323846	/* pi */
+#define CFM_2_PI    6.28318530717958647692  /* pi*2 */
 
 typedef enum {
     CFM_FLOAT32 = 0,
@@ -16,10 +16,8 @@ typedef enum {
 } cfm_dtype;
 
 typedef enum {
-    CFM_H_PRINT = 0,    /* Horizontal print: (1, 2, 3, 4, ...) */
-    CFM_V_PRINT = 1,    /* Vertical print: (1,
-                                            2,
-                                            ...) */
+    CFM_H_PRINT = 0,    /* Horizontal print. */
+    CFM_V_PRINT = 1,    /* Vertical print. */
 } cfm_print_mode;
 
 typedef struct {
@@ -31,6 +29,7 @@ typedef struct {
     cfm_string name;
     uint8_t ndims;                  /* How many dimension;                      pytorch: t.dim() */
     uint16_t shape[CFM_MAX_DIMS];   /* How many elements for each dimension;    pytorch: t.shape */
+    uint16_t strides[CFM_MAX_DIMS];
     uint64_t numel;
     cfm_dtype dtype;
     void *data;
@@ -61,7 +60,7 @@ cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
 void cfm_tensor_free(cfm_tensor *t);
 /* This function prints out the cfm_tensor t in the pytorch style. */
-void cfm_tensor_print(const cfm_tensor *t);
-void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm);
+void cfm_tensor_print(const cfm_tensor *t, int precision);
+void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision);
 
 #endif
