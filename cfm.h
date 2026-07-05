@@ -46,19 +46,45 @@ void cfm_string_free(cfm_string *str);
 /* This function creates a new cfm_tensor. */
 cfm_tensor *cfm_tensor_new(cfm_string name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
+
 /* This function creates a new cfm_tensor from existing data. */
 cfm_tensor *cfm_tensor_from(cfm_string name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, void *data, bool requires_grad);
-/* This function returns a new cfm_tensor filled with random
- * numbers from a uniform distribution on the interval [0, 1). */
+
+/* This function returns a new cfm_tensor filled with random numbers from a 
+ * uniform distribution on the interval [0, 1). */
 cfm_tensor *cfm_tensor_rand(cfm_string name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
+
 /* This function returns a new cfm_tensor filled with random 
  * numbers from a normal distribution with mean 0 and variance 1. 
  * Implemented following https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform */
 cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype, 
         uint8_t ndims, uint16_t *shape, bool requires_grad);
+
 void cfm_tensor_free(cfm_tensor *t);
+
+/* This function returns a new one-dimensional cfm_tensor of size end/step_size whose
+ * values are evenly spaced from start to end. 
+ * Note: end to start not supported yet. */
+#define cfm_tensor_linspace(name, dtype, start, end, step_size, requires_grad)  \
+    _Generic((start),                                                           \
+            float:    cfm_tensor_linspace_float32,                              \
+            double:    cfm_tensor_linspace_float64                              \
+            )(name, dtype, start, end, step_size, requires_grad) 
+cfm_tensor *cfm_tensor_linspace_float32(cfm_string name, cfm_dtype dtype,
+        float start, float end, float step_size, bool requires_grad);
+cfm_tensor *cfm_tensor_linspace_float64(cfm_string name, cfm_dtype dtype,
+        double start, double end, double step_size, bool requires_grad);
+
+/* This function returns a new cfm_tensor filled with fill_value. */
+cfm_tensor *cfm_tensor_full(cfm_string name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, void *value, bool requires_grad);
+
+//cat
+//expand
+//the python xt[-1] equivalent for cfm_tensor
+
 /* This function prints out the cfm_tensor t in the pytorch style. */
 void cfm_tensor_print(const cfm_tensor *t, int precision);
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision);
