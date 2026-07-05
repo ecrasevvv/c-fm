@@ -14,6 +14,10 @@
 #define CFM_ASSERT assert
 #endif  /* CFM_ASSERT */
 
+#ifndef CFMDEF
+#define CFMDEF static inline
+#endif /* CFMDEF */
+
 /* Debug macro used to print a vector. */
 #define CFM_D_VEC_PRINT(V, s)                                   \
     do {                                                        \
@@ -142,15 +146,45 @@ cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype,
             for (size_t i = 0; i < t->numel; ++i) {
                 double u1 = (double)rand()/(double)RAND_MAX;
                 double u2 = (double)rand()/(double)RAND_MAX;
-                d_data[i] = sqrt(-2.f*log(u1)) * cos(CFM_2_PI*u2);
+                d_data[i] = sqrt(-2.0*log(u1)) * cos(CFM_2_PI*u2);
             }
             break;
     }
     return t;
 }
 
+cfm_tensor *cfm_tensor_linspace_float32(cfm_string name, cfm_dtype dtype,
+        float start, float end, float step_size, bool requires_grad) {
+    CFM_ASSERT(step_size <= end);
+    const int nsteps = (end-start)/step_size+1;
+    const uint8_t ndims = 1;
+    uint16_t shape[1] = {nsteps};
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    if (!t) cfm_die("Out of memory");
+    float *data = t->data;
+    for (int i = 0; i < nsteps; ++i) {
+        data[i] = start+i*step_size;
+    }
+    return t;
+}
+
+cfm_tensor *cfm_tensor_linspace_float64(cfm_string name, cfm_dtype dtype,
+        double start, double end, double step_size, bool requires_grad) {
+    CFM_ASSERT(step_size <= end);
+    const int nsteps = (end-start)/step_size+1;
+    const uint8_t ndims = 1;
+    uint16_t shape[1] = {nsteps};
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    if (!t) cfm_die("Out of memory");
+    double *data = t->data;
+    for (int i = 0; i < nsteps; ++i) {
+        data[i] = start+i*step_size;
+    }
+    return t;
+}
+
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */
-static double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
+CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
     return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
 }
 
