@@ -66,8 +66,8 @@ void cfm_tensor_free(cfm_tensor *t);
  * Note: reverse do not supported yet (from start=5 to end=0 for example). */
 #define cfm_tensor_linspace(name, dtype, start, end, step_size, requires_grad)  \
     _Generic((start),                                                           \
-            float:      cfm_tensor_linspace_float32,                            \
-            double:     cfm_tensor_linspace_float64                             \
+            float:  cfm_tensor_linspace_float32,                                \
+            double: cfm_tensor_linspace_float64                                 \
             )(name, dtype, start, end, step_size, requires_grad) 
 cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
         float start, float end, float step_size, bool requires_grad);
@@ -75,8 +75,15 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
         double start, double end, double step_size, bool requires_grad);
 
 /* This function returns a new cfm_tensor filled with fill_value. */
-cfm_tensor *cfm_tensor_full(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, void *value, bool requires_grad);
+#define cfm_tensor_full(name, dtype, ndims, shape, fill_value, requires_grad)   \
+    _Generic((fill_value),                                                      \
+            float:  cfm_tensor_full_float32,                                    \
+            double: cfm_tensor_full_float64                                     \
+            )(name, dtype, ndims, shape, fill_value, requires_grad)
+cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, float fill_value, bool requires_grad);
+cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, double fill_value, bool requires_grad);
 
 //cat
 //expand

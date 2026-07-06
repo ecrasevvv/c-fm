@@ -188,6 +188,28 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
     return t;
 }
 
+cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, float fill_value, bool requires_grad) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    if (!t) cfm_die("Out of memory");
+    float *data = t->data;
+    for (size_t i = 0; i < t->numel; ++i) {
+        data[i] = fill_value;
+    }
+    return t;
+}
+
+cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, double fill_value, bool requires_grad) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    if (!t) cfm_die("Out of memory");
+    double *data = t->data;
+    for (size_t i = 0; i < t->numel; ++i) {
+        data[i] = fill_value;
+    }
+    return t;
+}
+
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */
 CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
     return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
