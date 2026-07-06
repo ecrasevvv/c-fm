@@ -84,6 +84,14 @@ cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
 cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, double fill_value, bool requires_grad);
 
+/* This function returns a new cfm_tensor filled with zeros. */
+cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, bool requires_grad);
+
+/* This function returns a new cfm_tensor filled with ones. */
+cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, bool requires_grad);
+
 //cat
 //expand
 //the python xt[-1] equivalent for cfm_tensor

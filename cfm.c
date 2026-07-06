@@ -225,6 +225,20 @@ cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
     return t;
 }
 
+cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, bool requires_grad) {
+    return (dtype == CFM_FLOAT32) 
+        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 0.f, requires_grad)
+        : cfm_tensor_full_float64(name, dtype, ndims, shape, 0.0, requires_grad);
+}
+
+cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
+        uint8_t ndims, uint16_t *shape, bool requires_grad) {
+    return (dtype == CFM_FLOAT32) 
+        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 1.f, requires_grad)
+        : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0, requires_grad);
+}
+
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */
 CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
     return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
