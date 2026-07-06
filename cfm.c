@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
 #include "cfm.h"
 
 #ifndef CFM_FREE
@@ -23,8 +22,11 @@
 #endif 
 
 #ifndef _2_M_PI
-#define _2_M_PI M_PI*2.0
+#define _2_M_PI (M_PI*2.0)
 #endif
+
+#define CFM_EPS_FLOAT32 1e-10f
+#define CFM_EPS_FLOAT64 1e-10
 
 /* Debug macro used to print a vector. */
 #define CFM_D_VEC_PRINT(V, s)                                   \
@@ -68,7 +70,7 @@ static size_t cfm_element_size(cfm_dtype dtype) {
 }
 
 /* This function returns the stride (https://numpy.org/doc/2.1/reference/arrays.ndarray.html#arrays-ndarray
- * in the "Internal memory layout of an ndarray) which corresponds to the bytes to step in each dimension
+ * in the "Internal memory layout of an ndarray" section) which corresponds to the bytes to step in each dimension
  * when traversing an array. */
 static void cfm_set_tensor_strides(cfm_tensor *t) {
     /* strides[k] = shape[k+1] * shape[k+2] * ... * shape[ndims] */
@@ -137,7 +139,6 @@ cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
 
 cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
         uint8_t ndims, uint16_t *shape, bool requires_grad) {
-    srand(time(NULL));
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     CFM_ASSERT(t != NULL);
     
@@ -145,7 +146,7 @@ cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype,
         case CFM_FLOAT32:
             float *f_data = t->data;
             for (size_t i = 0; i < t->numel; ++i) {
-                float u1 = (float)rand()/(float)RAND_MAX;
+                float u1 = (float)rand()/((float)RAND_MAX+CFM_EPS_FLOAT32);
                 float u2 = (float)rand()/(float)RAND_MAX;
                 f_data[i] = sqrtf(-2.f*log((float)u1)) * cosf(_2_M_PI*u2);
             }
@@ -153,7 +154,7 @@ cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype,
         case CFM_FLOAT64:
             double *d_data = t->data;
             for (size_t i = 0; i < t->numel; ++i) {
-                double u1 = (double)rand()/(double)RAND_MAX;
+                double u1 = (double)rand()/((double)RAND_MAX+CFM_EPS_FLOAT64);
                 double u2 = (double)rand()/(double)RAND_MAX;
                 d_data[i] = sqrt(-2.0*log(u1)) * cos(_2_M_PI*u2);
             }
