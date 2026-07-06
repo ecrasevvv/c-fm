@@ -62,8 +62,7 @@ cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype,
 void cfm_tensor_free(cfm_tensor *t);
 
 /* This function returns a new one-dimensional cfm_tensor of size end/step_size whose
- * values are evenly spaced from start to end. 
- * Note: reverse do not supported yet (from start=5 to end=0 for example). */
+ * values are evenly spaced from start to end. */
 #define cfm_tensor_linspace(name, dtype, start, end, step_size, requires_grad)  \
     _Generic((start),                                                           \
             float:  cfm_tensor_linspace_float32,                                \

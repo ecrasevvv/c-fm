@@ -18,6 +18,10 @@
 #define CFMDEF static inline
 #endif /* CFMDEF */
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif 
+
 #ifndef _2_M_PI
 #define _2_M_PI M_PI*2.0
 #endif
@@ -160,30 +164,40 @@ cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype,
 
 cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
         float start, float end, float step_size, bool requires_grad) {
-    CFM_ASSERT(step_size <= end);
-    const int nsteps = (end-start)/step_size+1;
+    const int nsteps = (start > end) ? (start-end)/step_size+1 : (end-start)/step_size+1;
     const uint8_t ndims = 1;
     uint16_t shape[1] = {nsteps};
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     if (!t) cfm_die("Out of memory");
     float *data = t->data;
-    for (int i = 0; i < nsteps; ++i) {
-        data[i] = start+i*step_size;
+    if (start > end) {
+        for (int i = 0; i < nsteps; ++i) {
+            data[i] = start-i*step_size;
+        }
+    } else {
+        for (int i = 0; i < nsteps; ++i) {
+            data[i] = start+i*step_size;
+        }
     }
     return t;
 }
 
 cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
         double start, double end, double step_size, bool requires_grad) {
-    CFM_ASSERT(step_size <= end);
-    const int nsteps = (end-start)/step_size+1;
+    const int nsteps = (start > end) ? (start-end)/step_size+1 : (end-start)/step_size+1;
     const uint8_t ndims = 1;
     uint16_t shape[1] = {nsteps};
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     if (!t) cfm_die("Out of memory");
     double *data = t->data;
-    for (int i = 0; i < nsteps; ++i) {
-        data[i] = start+i*step_size;
+    if (start > end) {
+        for (int i = 0; i < nsteps; ++i) {
+            data[i] = start-i*step_size;
+        }
+    } else {
+        for (int i = 0; i < nsteps; ++i) {
+            data[i] = start+i*step_size;
+        }
     }
     return t;
 }
@@ -266,7 +280,7 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
         }
 
         printf("%.*f", precision, cfm_tensor_get_element(t, i));
-    }
+   }
     for (uint8_t d = 0; d < t->ndims; d++) putchar(']');
     printf(")\n");
 }
