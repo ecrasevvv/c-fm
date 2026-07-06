@@ -229,6 +229,13 @@ CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
     return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
 }
 
+/* This function returns the position for a flat idx whitin a specific dimension dim. 
+ * Maps a flat idx to a N-dimensional position. */
+CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim, 
+        const uint16_t strides[], const uint16_t shape[]) {
+    return (idx/strides[dim]) % shape[dim];
+}
+
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision) {
     printf("%s(", t->name->content);
     switch (pm) {
@@ -262,9 +269,7 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
     for (uint64_t i = 0; i < t->numel; i++) {
         int wrap = 0;
         for (int d = (int)t->ndims - 1; d >= 0; d--) {
-            // i/strides[d] how many blocks of stride-size have we passed
-            // %shape[d] where we are whitin that block
-            if ((i / t->strides[d]) % t->shape[d] == 0) wrap++;
+            if (cfm_tensor_get_position_whitin_dimension(i, d, t->strides, t->shape) == 0) wrap++;
             else break;
         }
 
