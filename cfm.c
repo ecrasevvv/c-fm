@@ -18,6 +18,10 @@
 #define CFMDEF static inline
 #endif /* CFMDEF */
 
+#ifndef _2_M_PI
+#define _2_M_PI M_PI*2.0
+#endif
+
 /* Debug macro used to print a vector. */
 #define CFM_D_VEC_PRINT(V, s)                                   \
     do {                                                        \
@@ -49,6 +53,7 @@ void cfm_string_free(cfm_string *str) {
 }
 
 void cfm_tensor_free(cfm_tensor *t) {
+    cfm_string_free(t->name);
     CFM_FREE(t->data);
     CFM_FREE(t);
 }
@@ -71,11 +76,11 @@ static void cfm_set_tensor_strides(cfm_tensor *t) {
     }
 }
 
-cfm_tensor *cfm_tensor_new(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
-    t->name = name;
+    t->name = cfm_string_new(name);
     t->dtype = dtype;
     t->ndims = ndims;
     memcpy(t->shape, shape, sizeof(uint16_t) * ndims);
@@ -88,11 +93,11 @@ cfm_tensor *cfm_tensor_new(cfm_string name, cfm_dtype dtype,
     return t;
 }
 
-cfm_tensor *cfm_tensor_from(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, void *data, bool requires_grad) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
-    t->name = name;
+    t->name = cfm_string_new(name);
     t->dtype = dtype;
     t->ndims = ndims;
     memcpy(t->shape, shape, sizeof(uint16_t) * ndims);
@@ -104,7 +109,7 @@ cfm_tensor *cfm_tensor_from(cfm_string name, cfm_dtype dtype,
     return t;
 }
 
-cfm_tensor *cfm_tensor_rand(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad) {
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
     CFM_ASSERT(t != NULL);
@@ -126,7 +131,7 @@ cfm_tensor *cfm_tensor_rand(cfm_string name, cfm_dtype dtype,
     return t;
 }
 
-cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype, 
+cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
         uint8_t ndims, uint16_t *shape, bool requires_grad) {
     srand(time(NULL));
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
@@ -138,7 +143,7 @@ cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype,
             for (size_t i = 0; i < t->numel; ++i) {
                 float u1 = (float)rand()/(float)RAND_MAX;
                 float u2 = (float)rand()/(float)RAND_MAX;
-                f_data[i] = sqrtf(-2.f*log((float)u1)) * cosf(CFM_2_PI*u2);
+                f_data[i] = sqrtf(-2.f*log((float)u1)) * cosf(_2_M_PI*u2);
             }
             break;
         case CFM_FLOAT64:
@@ -146,14 +151,14 @@ cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype,
             for (size_t i = 0; i < t->numel; ++i) {
                 double u1 = (double)rand()/(double)RAND_MAX;
                 double u2 = (double)rand()/(double)RAND_MAX;
-                d_data[i] = sqrt(-2.0*log(u1)) * cos(CFM_2_PI*u2);
+                d_data[i] = sqrt(-2.0*log(u1)) * cos(_2_M_PI*u2);
             }
             break;
     }
     return t;
 }
 
-cfm_tensor *cfm_tensor_linspace_float32(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
         float start, float end, float step_size, bool requires_grad) {
     CFM_ASSERT(step_size <= end);
     const int nsteps = (end-start)/step_size+1;
@@ -168,7 +173,7 @@ cfm_tensor *cfm_tensor_linspace_float32(cfm_string name, cfm_dtype dtype,
     return t;
 }
 
-cfm_tensor *cfm_tensor_linspace_float64(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
         double start, double end, double step_size, bool requires_grad) {
     CFM_ASSERT(step_size <= end);
     const int nsteps = (end-start)/step_size+1;
@@ -189,7 +194,7 @@ CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
 }
 
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision) {
-    printf("%s(", t->name.content);
+    printf("%s(", t->name->content);
     switch (pm) {
         case CFM_H_PRINT:
             for (size_t i = 0; i < t->numel; ++i) {
@@ -199,10 +204,9 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
             break;
         case CFM_V_PRINT:
             putchar('\n');
-            size_t indent = strlen(t->name.content);
             for (size_t i = 0; i < t->numel; ++i) {
-                if (i == t->numel-1) printf("%*s%.*f)\n", (int)indent, "", precision, cfm_tensor_get_element(t, i));
-                else printf("%*s%.*f,\n", (int)indent, "", precision, cfm_tensor_get_element(t, i));
+                if (i == t->numel-1) printf("%*s%.*f)\n", (int)t->name->len, "", precision, cfm_tensor_get_element(t, i));
+                else printf("%*s%.*f,\n", (int)t->name->len, "", precision, cfm_tensor_get_element(t, i));
             }
             break;
     }
@@ -211,17 +215,13 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
 void cfm_tensor_print(const cfm_tensor *t, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
 
-    const char *t_name = t->name.content;
-    size_t t_name_len = strlen(t_name);
-    if (t_name_len == 0) cfm_die("strlen error");
-
     /* Scalar. */
     if (t->ndims == 0) {
-        printf("%s(%.*f)\n", t_name, precision, cfm_tensor_get_element(t, 0));
+        printf("%s(%.*f)\n", t->name->content, precision, cfm_tensor_get_element(t, 0));
         return;
     }
 
-    printf("%s(", t_name);
+    printf("%s(", t->name->content);
     for (uint8_t d = 0; d < t->ndims; d++) putchar('[');
     for (uint64_t i = 0; i < t->numel; i++) {
         int wrap = 0;
@@ -235,7 +235,7 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
         if (i > 0) {
             if (wrap > 0) {
                 for (int w = 0; w < wrap; w++) putchar(']');
-                int indent = t_name_len + t->ndims - wrap + 1;
+                int indent = t->name->len + t->ndims - wrap + 1;
                 printf(",\n%*s", indent, "");
                 for (int w = 0; w < wrap; w++) putchar('[');
             } else {
