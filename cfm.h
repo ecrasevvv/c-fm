@@ -7,9 +7,6 @@
 #define CFM_MAX_DIMS        4
 #define CFM_STRING_MAX_LEN  64
 
-#define CFM_PI		3.14159265358979323846	/* pi */
-#define CFM_2_PI    6.28318530717958647692  /* pi*2 */
-
 typedef enum {
     CFM_FLOAT32 = 0,
     CFM_FLOAT64 = 1,
@@ -26,7 +23,7 @@ typedef struct {
 } cfm_string;
 
 typedef struct {
-    cfm_string name;
+    cfm_string *name;
     uint8_t ndims;                  /* How many dimension;                      pytorch: t.dim() */
     uint16_t shape[CFM_MAX_DIMS];   /* How many elements for each dimension;    pytorch: t.shape */
     uint16_t strides[CFM_MAX_DIMS];
@@ -44,41 +41,41 @@ void cfm_string_print(const cfm_string *str);
 void cfm_string_free(cfm_string *str);
 
 /* This function creates a new cfm_tensor. */
-cfm_tensor *cfm_tensor_new(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
 
 /* This function creates a new cfm_tensor from existing data. */
-cfm_tensor *cfm_tensor_from(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, void *data, bool requires_grad);
 
 /* This function returns a new cfm_tensor filled with random numbers from a 
  * uniform distribution on the interval [0, 1). */
-cfm_tensor *cfm_tensor_rand(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
 
 /* This function returns a new cfm_tensor filled with random 
  * numbers from a normal distribution with mean 0 and variance 1. 
  * Implemented following https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform */
-cfm_tensor *cfm_tensor_randn(cfm_string name, cfm_dtype dtype, 
+cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
         uint8_t ndims, uint16_t *shape, bool requires_grad);
 
 void cfm_tensor_free(cfm_tensor *t);
 
 /* This function returns a new one-dimensional cfm_tensor of size end/step_size whose
  * values are evenly spaced from start to end. 
- * Note: end to start not supported yet. */
+ * Note: reverse do not supported yet (from start=5 to end=0 for example). */
 #define cfm_tensor_linspace(name, dtype, start, end, step_size, requires_grad)  \
     _Generic((start),                                                           \
-            float:    cfm_tensor_linspace_float32,                              \
-            double:    cfm_tensor_linspace_float64                              \
+            float:      cfm_tensor_linspace_float32,                            \
+            double:     cfm_tensor_linspace_float64                             \
             )(name, dtype, start, end, step_size, requires_grad) 
-cfm_tensor *cfm_tensor_linspace_float32(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
         float start, float end, float step_size, bool requires_grad);
-cfm_tensor *cfm_tensor_linspace_float64(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
         double start, double end, double step_size, bool requires_grad);
 
 /* This function returns a new cfm_tensor filled with fill_value. */
-cfm_tensor *cfm_tensor_full(cfm_string name, cfm_dtype dtype,
+cfm_tensor *cfm_tensor_full(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, void *value, bool requires_grad);
 
 //cat
