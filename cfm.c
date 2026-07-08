@@ -33,6 +33,7 @@
     do {                                                        \
         CFM_ASSERT(V != NULL);                                  \
         for(size_t i = 0; i < s; ++i) printf("%d ", (int)V[i]); \
+        putchar('\n');                                          \
     } while(0)
 
 static void cfm_die(const char *msg) {
@@ -237,6 +238,62 @@ cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
     return (dtype == CFM_FLOAT32) 
         ? cfm_tensor_full_float32(name, dtype, ndims, shape, 1.f, requires_grad)
         : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0, requires_grad);
+}
+
+cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
+        int ntensors, uint8_t cat_dim, bool requires_grad) {
+    /*
+     * CURRENT EXAMPLE: 
+     *  x1.shape[2, 3]  dtype=CFM_FLOAT64
+     *  x2.shape[3, 3]  dtype=CFM_FLOAT64
+     *  cat_dim = 1
+     *  - These are cat-able tensors
+     */
+
+    if (ntensors <= 1) cfm_die("Not enough tensors to cat.");
+
+    /* Promote a CFM_FLOAT32 to CFM_FLOAT64 will only add a bunch of useless zeros. */
+    int i = ntensors;
+    while (--i>0 && tensors[i]->dtype == tensors[0]->dtype);
+    if (i != 0) cfm_die("cfm_tensor_cat cannot cat tensors with different cfm_dtype.");
+
+    /* Tensors must have same number of dimensions. */
+    i = ntensors;
+    while (--i>0 && tensors[i]->ndims == tensors[0]->ndims);
+    if (i != 0) cfm_die("cfm_tensor_cat cannot cat tensors with different ndims.");
+
+    /* Tensor must have the same shape (except in the concatening dimension cat_dim). */
+    uint8_t dms = tensors[0]->ndims;
+    for (int t = 1; t < ntensors; ++t) {
+        for (uint8_t d = 0; d < dms; ++d) {
+            if (d == cat_dim) continue;
+            if (tensors[0]->shape[d] != tensors[t]->shape[d])
+                cfm_die("cfm_tensor_cat shape mismatch.");
+        }
+    }
+
+    uint16_t cat_t_shape[dms];
+    for (uint8_t d = 0; d < dms; ++d) {
+        if (d == cat_dim) {
+            cat_t_shape[d] = 0;
+            for (int t = 0; t < ntensors; ++t) {
+                cat_t_shape[d] += tensors[t]->shape[d];
+            }
+        } else {
+            cat_t_shape[d] = tensors[0]->shape[d];
+        }
+    }
+
+    cfm_tensor *t = cfm_tensor_new(name,
+            tensors[0]->dtype,
+            dms,
+            cat_t_shape,
+            requires_grad);
+    if (!t) cfm_die("Out of memory");
+
+    // todo: populate t
+
+    return t;
 }
 
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */

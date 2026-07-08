@@ -92,8 +92,13 @@ cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
 cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
         uint8_t ndims, uint16_t *shape, bool requires_grad);
 
-//cat
+/* Concatenates the given sequence of tensors in tensors in the given dimension.
+ * All tensors must either have the same shape (except in the concatenating dimension). */
+cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
+        int ntensors, uint8_t dim, bool requires_grad);
+
 //expand
+//view
 //the python xt[-1] equivalent for cfm_tensor
 
 /* This function prints out the cfm_tensor t in the pytorch style. */
