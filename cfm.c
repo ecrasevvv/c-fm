@@ -32,7 +32,12 @@
 #define CFM_D_VEC_PRINT(V, s)                                   \
     do {                                                        \
         CFM_ASSERT(V != NULL);                                  \
-        for(size_t i = 0; i < s; ++i) printf("%d ", (int)V[i]); \
+        putchar('[');                                           \
+        for(int i = 0; i < s; ++i) {                            \
+            if (i == s-1) printf("%d", (int)V[i]);              \
+            else printf("%d, ", (int)V[i]);                     \
+        }                                                       \
+        putchar(']');                                           \
         putchar('\n');                                          \
     } while(0)
 
@@ -240,6 +245,18 @@ cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
         : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0, requires_grad);
 }
 
+/* This function returns the element in the position specified by idx from a given cfm_tensor t. */
+CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
+    return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
+}
+
+/* This function returns the position for a flat idx whitin a specific dimension dim. 
+ * Maps a flat idx to a N-dimensional position. */
+CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim, 
+        const uint16_t strides[], const uint16_t shape[]) {
+    return (idx/strides[dim]) % shape[dim];
+}
+
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
         int ntensors, uint8_t cat_dim, bool requires_grad) {
     /*
@@ -297,20 +314,20 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     return t;
 }
 
-/* This function returns the element in the position specified by idx from a given cfm_tensor t. */
-CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
-    return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
-}
-
-/* This function returns the position for a flat idx whitin a specific dimension dim. 
- * Maps a flat idx to a N-dimensional position. */
-CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim, 
-        const uint16_t strides[], const uint16_t shape[]) {
-    return (idx/strides[dim]) % shape[dim];
-}
-
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision) {
+    CFM_ASSERT(precision > 0 && precision <= 6);
+#ifdef DEBUG
+    printf("TENSOR: %s\n", t->name->content);
+    printf("        ndims:      %u\n", t->ndims);
+    printf("        shape:      "); CFM_D_VEC_PRINT(t->shape, t->ndims);
+    printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
+    printf("        numel:      %zu\n", t->numel);
+    printf("        dtype:      %s\n", (t->dtype == CFM_FLOAT32) ? "CFM_FLOAT32" : "CFM_FLOAT64");
+    printf("        r_grad:     %s\n", (t->requires_grad == true) ? "yes" : "no");
+    printf("        elements:   ");
+#else
     printf("%s(", t->name->content);
+#endif
     switch (pm) {
         case CFM_H_PRINT:
             for (size_t i = 0; i < t->numel; ++i) {
@@ -319,10 +336,15 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
             }
             break;
         case CFM_V_PRINT:
+#ifdef DEBUG
+            int indent = 20;
+#else
+            int indent = (int)t->name->len;
+#endif
             putchar('\n');
             for (size_t i = 0; i < t->numel; ++i) {
-                if (i == t->numel-1) printf("%*s%.*f)\n", (int)t->name->len, "", precision, cfm_tensor_get_element(t, i));
-                else printf("%*s%.*f,\n", (int)t->name->len, "", precision, cfm_tensor_get_element(t, i));
+                if (i == t->numel-1) printf("%*s%.*f)\n", indent, "", precision, cfm_tensor_get_element(t, i));
+                else printf("%*s%.*f,\n", indent, "", precision, cfm_tensor_get_element(t, i));
             }
             break;
     }
@@ -330,14 +352,23 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
 
 void cfm_tensor_print(const cfm_tensor *t, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
-
+#ifdef DEBUG
+    printf("TENSOR: %s\n", t->name->content);
+    printf("        ndims:      %u\n", t->ndims);
+    printf("        shape:      "); CFM_D_VEC_PRINT(t->shape, t->ndims);
+    printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
+    printf("        numel:      %zu\n", t->numel);
+    printf("        dtype:      %s\n", (t->dtype == CFM_FLOAT32) ? "CFM_FLOAT32" : "CFM_FLOAT64");
+    printf("        r_grad:     %s\n", (t->requires_grad == true) ? "yes" : "no");
+    printf("        elements:   ");
+#else
     /* Scalar. */
     if (t->ndims == 0) {
         printf("%s(%.*f)\n", t->name->content, precision, cfm_tensor_get_element(t, 0));
         return;
     }
-
     printf("%s(", t->name->content);
+#endif
     for (uint8_t d = 0; d < t->ndims; d++) putchar('[');
     for (uint64_t i = 0; i < t->numel; i++) {
         int wrap = 0;
@@ -349,7 +380,11 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
         if (i > 0) {
             if (wrap > 0) {
                 for (int w = 0; w < wrap; w++) putchar(']');
+#ifdef DEBUG
+                int indent = 20 + t->ndims - wrap;
+#else
                 int indent = t->name->len + t->ndims - wrap + 1;
+#endif
                 printf(",\n%*s", indent, "");
                 for (int w = 0; w < wrap; w++) putchar('[');
             } else {
