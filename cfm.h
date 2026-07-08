@@ -97,6 +97,11 @@ cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
         int ntensors, uint8_t dim, bool requires_grad);
 
+/* This function returns the last element from a given cfm_tensor.
+ * The last element can be a scalar, vector, matrix, n-dim matrix,
+ * it depends on the dim of the cfm_tensor. */
+cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t, bool requires_grad);
+
 //expand
 //view
 //the python xt[-1] equivalent for cfm_tensor

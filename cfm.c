@@ -361,6 +361,32 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     return t;
 }
 
+cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t, bool requires_grad) {
+    CFM_ASSERT(t->ndims > 0);
+    uint16_t shape[t->ndims-1];
+    for (uint8_t i = 0; i < t->ndims-1; ++i) shape[i] = t->shape[i+1];
+    cfm_tensor *tt = cfm_tensor_new(t->name->content, t->dtype, t->ndims-1, shape, requires_grad);
+    if (!tt) cfm_die("Out of memory");
+    int offset = (t->shape[0]-1) * t->strides[0];
+    switch (tt->dtype) {
+        case CFM_FLOAT32:
+            float *tt_f_data = tt->data;
+            float *t_f_data = t->data;
+            for (uint64_t i = 0; i < tt->numel; ++i) {
+                tt_f_data[i] = t_f_data[i+offset];
+            }
+            break;
+        case CFM_FLOAT64:
+            double *tt_d_data = tt->data;
+            double *t_d_data = t->data;
+            for (uint64_t i = 0; i < tt->numel; ++i) {
+                tt_d_data[i] = t_d_data[i+offset];
+            }
+            break;
+    }
+    return tt;
+}
+
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
 #ifdef DEBUG
