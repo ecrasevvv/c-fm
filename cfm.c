@@ -390,7 +390,8 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t, bool requires_grad) {
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
 #ifdef DEBUG
-    printf("TENSOR: %s\n", t->name->content);
+    printf("TENSOR:\n");
+    printf("        name:       %s\n", t->name->content);
     printf("        ndims:      %u\n", t->ndims);
     printf("        shape:      "); CFM_D_VEC_PRINT(t->shape, t->ndims);
     printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
@@ -426,7 +427,8 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
 void cfm_tensor_print(const cfm_tensor *t, int precision) {
     CFM_ASSERT(precision > 0 && precision <= 6);
 #ifdef DEBUG
-    printf("TENSOR: %s\n", t->name->content);
+    printf("TENSOR:\n");
+    printf("        name:       %s\n", t->name->content);
     printf("        ndims:      %u\n", t->ndims);
     printf("        shape:      "); CFM_D_VEC_PRINT(t->shape, t->ndims);
     printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
