@@ -259,14 +259,6 @@ CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim,
 
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
         int ntensors, uint8_t cat_dim, bool requires_grad) {
-    /*
-     * CURRENT EXAMPLE: 
-     *  x1.shape[2, 3]  dtype=CFM_FLOAT64
-     *  x2.shape[3, 3]  dtype=CFM_FLOAT64
-     *  cat_dim = 1
-     *  - These are cat-able tensors
-     */
-
     if (ntensors <= 1) cfm_die("Not enough tensors to cat.");
 
     /* Promote a CFM_FLOAT32 to CFM_FLOAT64 will only add a bunch of useless zeros. */
@@ -309,7 +301,62 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     if (!t) cfm_die("Out of memory");
     CFM_ASSERT(t->shape[cat_dim] <= CFM_MAX_DIMS);
 
-    // todo: populate t
+    /* Start and end of each source tensor. */
+    uint16_t boundaries[ntensors+1];
+    boundaries[0] = 0;
+    for (int t = 0; t < ntensors; t++)
+        boundaries[t+1] = boundaries[t] + tensors[t]->shape[cat_dim];
+
+    /* Map a flat index i to the corresponding coords in a dim d. 
+     * Find the source tensor index src given cooords. 
+     * Calculate the src_idx of the element that needs to be inserted into out at i. */
+    uint16_t coords[dms];
+    switch (t->dtype) {
+        case CFM_FLOAT32: {
+            float *out = t->data;
+            for (uint64_t i = 0; i < t->numel; i++) {
+                uint64_t rem = i;
+                for (uint8_t d = 0; d < dms; d++) {
+                    coords[d] = rem / t->strides[d];
+                    rem %= t->strides[d];
+                }
+
+                int src = 0;
+                while (coords[cat_dim] >= boundaries[src+1]) src++;
+
+                coords[cat_dim] -= boundaries[src];
+
+                uint64_t src_idx = 0;
+                for (uint8_t d = 0; d < dms; d++)
+                    src_idx += coords[d] * tensors[src]->strides[d];
+
+                out[i] = ((float*)tensors[src]->data)[src_idx];
+            }
+            break;
+        }
+        case CFM_FLOAT64: {
+            double *out = t->data;
+            for (uint64_t i = 0; i < t->numel; i++) {
+                uint64_t rem = i;
+                for (uint8_t d = 0; d < dms; d++) {
+                    coords[d] = rem / t->strides[d];
+                    rem %= t->strides[d];
+                }
+
+                int src = 0;
+                while (coords[cat_dim] >= boundaries[src+1]) src++;
+
+                coords[cat_dim] -= boundaries[src];
+
+                uint64_t src_idx = 0;
+                for (uint8_t d = 0; d < dms; d++)
+                    src_idx += coords[d] * tensors[src]->strides[d];
+
+                out[i] = ((double*)tensors[src]->data)[src_idx];
+            }
+            break;
+        }
+    }
 
     return t;
 }
