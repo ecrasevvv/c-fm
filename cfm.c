@@ -290,6 +290,7 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
             cat_t_shape,
             requires_grad);
     if (!t) cfm_die("Out of memory");
+    CFM_ASSERT(t->shape[cat_dim] <= CFM_MAX_DIMS);
 
     // todo: populate t
 

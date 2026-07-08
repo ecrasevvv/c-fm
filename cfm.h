@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CFM_MAX_DIMS        4
+#define CFM_MAX_DIMS        32
 #define CFM_STRING_MAX_LEN  64
 
 typedef enum {
