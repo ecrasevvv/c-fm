@@ -34,12 +34,9 @@ typedef struct {
 
 /* This function allows the user to create a new cfm_string filled with content. */
 cfm_string *cfm_string_new(const char *content);
+
 void cfm_string_print(const cfm_string *str);
 void cfm_string_free(cfm_string *str);
-
-/* This function creates a new cfm_tensor. */
-cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
-        uint8_t ndims, const uint16_t *shape);
 
 /* This function creates a new cfm_tensor from existing data. */
 cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,

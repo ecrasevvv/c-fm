@@ -88,7 +88,8 @@ static void cfm_set_tensor_strides(cfm_tensor *t) {
     }
 }
 
-cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
+/* This function creates a new cfm_tensor with zero-inited data. */
+CFMDEF cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
         uint8_t ndims, const uint16_t *shape) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
@@ -99,7 +100,7 @@ cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
     t->numel = 1;
     for (size_t i = 0; i < t->ndims; ++i) t->numel *= t->shape[i]; 
     cfm_set_tensor_strides(t);
-    if (!(t->data = calloc(t->numel, cfm_element_size(t->dtype))))  /* zero-init new cfm_tensor data. */
+    if (!(t->data = calloc(t->numel, cfm_element_size(t->dtype))))
         cfm_die("Out of memory");
     return t;
 }
