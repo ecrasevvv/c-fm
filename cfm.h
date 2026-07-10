@@ -106,7 +106,9 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t);
 cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u,
         const cfm_tensor *v);
 
-//exp
+/* This function */
+cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *t);
+
 //mul
 
 //matmul

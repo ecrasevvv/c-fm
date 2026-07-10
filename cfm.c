@@ -507,3 +507,25 @@ cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tens
     }
     return t;
 }
+
+cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
+    cfm_tensor *t = cfm_tensor_new(name, u->dtype, u->ndims, u->shape);
+    if (!t) cfm_die("Out of memory");
+    switch (t->dtype) {
+        case CFM_FLOAT32:
+            float *f_t_data = t->data;
+            float *f_u_data = u->data;
+            for (uint64_t i = 0; i < t->numel; ++i) {
+                f_t_data[i] = expf(f_u_data[i]);
+            }
+            break;
+        case CFM_FLOAT64:
+            double *d_t_data = t->data;
+            double *d_u_data = u->data;
+            for (uint64_t i = 0; i < t->numel; ++i) {
+                d_t_data[i] = exp(d_u_data[i]);
+            }
+            break;
+    }
+    return t;
+}
