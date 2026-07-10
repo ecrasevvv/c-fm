@@ -89,7 +89,7 @@ static void cfm_set_tensor_strides(cfm_tensor *t) {
 }
 
 cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, bool requires_grad) {
+        uint8_t ndims, uint16_t *shape) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
     t->name = cfm_string_new(name);
@@ -101,12 +101,11 @@ cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
     cfm_set_tensor_strides(t);
     if (!(t->data = calloc(t->numel, cfm_element_size(t->dtype))))  /* zero-init new cfm_tensor data. */
         cfm_die("Out of memory");
-    t->requires_grad = requires_grad;
     return t;
 }
 
 cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, void *data, bool requires_grad) {
+        uint8_t ndims, uint16_t *shape, void *data) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
     t->name = cfm_string_new(name);
@@ -117,13 +116,12 @@ cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
     t->numel = 1;
     for (size_t i = 0; i < t->ndims; ++i) t->numel *= t->shape[i]; 
     cfm_set_tensor_strides(t);
-    t->requires_grad = requires_grad;
     return t;
 }
 
 cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, bool requires_grad) {
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+        uint8_t ndims, uint16_t *shape) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     CFM_ASSERT(t != NULL);
 
     switch (dtype) {
@@ -144,8 +142,8 @@ cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
-        uint8_t ndims, uint16_t *shape, bool requires_grad) {
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+        uint8_t ndims, uint16_t *shape) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     CFM_ASSERT(t != NULL);
     
     switch (dtype) {
@@ -170,11 +168,11 @@ cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
-        float start, float end, float step_size, bool requires_grad) {
+        float start, float end, float step_size) {
     const int nsteps = (start > end) ? (start-end)/step_size+1 : (end-start)/step_size+1;
     const uint8_t ndims = 1;
     uint16_t shape[1] = {nsteps};
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     float *data = t->data;
     if (start > end) {
@@ -190,11 +188,11 @@ cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
-        double start, double end, double step_size, bool requires_grad) {
+        double start, double end, double step_size) {
     const int nsteps = (start > end) ? (start-end)/step_size+1 : (end-start)/step_size+1;
     const uint8_t ndims = 1;
     uint16_t shape[1] = {nsteps};
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     double *data = t->data;
     if (start > end) {
@@ -210,8 +208,8 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, float fill_value, bool requires_grad) {
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+        uint8_t ndims, uint16_t *shape, float fill_value) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     float *data = t->data;
     for (size_t i = 0; i < t->numel; ++i) {
@@ -221,8 +219,8 @@ cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, double fill_value, bool requires_grad) {
-    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape, requires_grad);
+        uint8_t ndims, uint16_t *shape, double fill_value) {
+    cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     double *data = t->data;
     for (size_t i = 0; i < t->numel; ++i) {
@@ -232,17 +230,17 @@ cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, bool requires_grad) {
+        uint8_t ndims, uint16_t *shape) {
     return (dtype == CFM_FLOAT32) 
-        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 0.f, requires_grad)
-        : cfm_tensor_full_float64(name, dtype, ndims, shape, 0.0, requires_grad);
+        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 0.f)
+        : cfm_tensor_full_float64(name, dtype, ndims, shape, 0.0);
 }
 
 cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, bool requires_grad) {
+        uint8_t ndims, uint16_t *shape) {
     return (dtype == CFM_FLOAT32) 
-        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 1.f, requires_grad)
-        : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0, requires_grad);
+        ? cfm_tensor_full_float32(name, dtype, ndims, shape, 1.f)
+        : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0);
 }
 
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */
@@ -258,7 +256,7 @@ CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim,
 }
 
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
-        int ntensors, uint8_t cat_dim, bool requires_grad) {
+        int ntensors, uint8_t cat_dim) {
     if (ntensors <= 1) cfm_die("Not enough tensors to cat.");
 
     /* Promote a CFM_FLOAT32 to CFM_FLOAT64 will only add a bunch of useless zeros. */
@@ -296,8 +294,7 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     cfm_tensor *t = cfm_tensor_new(name,
             tensors[0]->dtype,
             dms,
-            cat_t_shape,
-            requires_grad);
+            cat_t_shape);
     if (!t) cfm_die("Out of memory");
     CFM_ASSERT(t->shape[cat_dim] <= CFM_MAX_DIMS);
 
@@ -361,11 +358,11 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     return t;
 }
 
-cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t, bool requires_grad) {
+cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t) {
     CFM_ASSERT(t->ndims > 0);
     uint16_t shape[t->ndims-1];
     for (uint8_t i = 0; i < t->ndims-1; ++i) shape[i] = t->shape[i+1];
-    cfm_tensor *tt = cfm_tensor_new(t->name->content, t->dtype, t->ndims-1, shape, requires_grad);
+    cfm_tensor *tt = cfm_tensor_new(t->name->content, t->dtype, t->ndims-1, shape);
     if (!tt) cfm_die("Out of memory");
     int offset = (t->shape[0]-1) * t->strides[0];
     switch (tt->dtype) {
@@ -397,7 +394,6 @@ void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision)
     printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
     printf("        numel:      %zu\n", t->numel);
     printf("        dtype:      %s\n", (t->dtype == CFM_FLOAT32) ? "CFM_FLOAT32" : "CFM_FLOAT64");
-    printf("        r_grad:     %s\n", (t->requires_grad == true) ? "yes" : "no");
     printf("        elements:   ");
 #else
     printf("%s(", t->name->content);
@@ -434,7 +430,6 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
     printf("        strides:    "); CFM_D_VEC_PRINT(t->strides, t->ndims);
     printf("        numel:      %zu\n", t->numel);
     printf("        dtype:      %s\n", (t->dtype == CFM_FLOAT32) ? "CFM_FLOAT32" : "CFM_FLOAT64");
-    printf("        r_grad:     %s\n", (t->requires_grad == true) ? "yes" : "no");
     printf("        elements:   ");
 #else
     /* Scalar. */
