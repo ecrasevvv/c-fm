@@ -39,22 +39,22 @@ void cfm_string_free(cfm_string *str);
 
 /* This function creates a new cfm_tensor. */
 cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape);
+        uint8_t ndims, const uint16_t *shape);
 
 /* This function creates a new cfm_tensor from existing data. */
 cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, void *data);
+        uint8_t ndims, const uint16_t *shape, void *data);
 
 /* This function returns a new cfm_tensor filled with random numbers from a 
  * uniform distribution on the interval [0, 1). */
 cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape);
+        uint8_t ndims, const uint16_t *shape);
 
 /* This function returns a new cfm_tensor filled with random 
  * numbers from a normal distribution with mean 0 and variance 1. 
  * Implemented following https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform */
 cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
-        uint8_t ndims, uint16_t *shape);
+        uint8_t ndims, const uint16_t *shape);
 
 void cfm_tensor_free(cfm_tensor *t);
 
@@ -77,17 +77,17 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
             double: cfm_tensor_full_float64                                     \
             )(name, dtype, ndims, shape, fill_value)
 cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, float fill_value);
+        uint8_t ndims, const uint16_t *shape, float fill_value);
 cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, double fill_value);
+        uint8_t ndims, const uint16_t *shape, double fill_value);
 
 /* This function returns a new cfm_tensor filled with zeros. */
 cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape);
+        uint8_t ndims, const uint16_t *shape);
 
 /* This function returns a new cfm_tensor filled with ones. */
 cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape);
+        uint8_t ndims, const uint16_t *shape);
 
 /* Concatenates the given sequence of tensors in tensors in the given dimension.
  * All tensors must either have the same shape (except in the concatenating dimension). */
@@ -101,6 +101,15 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t);
 
 //expand
 //view
+
+/* This function */
+cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v);
+
+//exp
+//mul
+
+//matmul
 
 /* This function prints out the cfm_tensor t in the pytorch style. */
 void cfm_tensor_print(const cfm_tensor *t, int precision);
