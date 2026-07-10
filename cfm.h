@@ -102,12 +102,13 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t);
 //expand
 //view
 
-/* This function */
+/* This function returns a new tensor which data is u->data + v->data. */
 cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u,
         const cfm_tensor *v);
 
-/* This function */
-cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *t);
+/* This function returns a new tensor with the exponential of the 
+ * elements of the input tensor u. */
+cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u);
 
 //mul
 
