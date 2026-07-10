@@ -89,7 +89,7 @@ static void cfm_set_tensor_strides(cfm_tensor *t) {
 }
 
 cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape) {
+        uint8_t ndims, const uint16_t *shape) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
     t->name = cfm_string_new(name);
@@ -105,7 +105,7 @@ cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, void *data) {
+        uint8_t ndims, const uint16_t *shape, void *data) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
     if (!t) cfm_die("Out of memory"); 
     t->name = cfm_string_new(name);
@@ -120,7 +120,7 @@ cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape) {
+        uint8_t ndims, const uint16_t *shape) {
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     CFM_ASSERT(t != NULL);
 
@@ -142,7 +142,7 @@ cfm_tensor *cfm_tensor_rand(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_randn(const char *name, cfm_dtype dtype, 
-        uint8_t ndims, uint16_t *shape) {
+        uint8_t ndims, const uint16_t *shape) {
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     CFM_ASSERT(t != NULL);
     
@@ -208,7 +208,7 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, float fill_value) {
+        uint8_t ndims, const uint16_t *shape, float fill_value) {
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     float *data = t->data;
@@ -219,7 +219,7 @@ cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape, double fill_value) {
+        uint8_t ndims, const uint16_t *shape, double fill_value) {
     cfm_tensor *t = cfm_tensor_new(name, dtype, ndims, shape);
     if (!t) cfm_die("Out of memory");
     double *data = t->data;
@@ -230,14 +230,14 @@ cfm_tensor *cfm_tensor_full_float64(const char *name, cfm_dtype dtype,
 }
 
 cfm_tensor *cfm_tensor_zeros(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape) {
+        uint8_t ndims, const uint16_t *shape) {
     return (dtype == CFM_FLOAT32) 
         ? cfm_tensor_full_float32(name, dtype, ndims, shape, 0.f)
         : cfm_tensor_full_float64(name, dtype, ndims, shape, 0.0);
 }
 
 cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
-        uint8_t ndims, uint16_t *shape) {
+        uint8_t ndims, const uint16_t *shape) {
     return (dtype == CFM_FLOAT32) 
         ? cfm_tensor_full_float32(name, dtype, ndims, shape, 1.f)
         : cfm_tensor_full_float64(name, dtype, ndims, shape, 1.0);
@@ -257,7 +257,7 @@ CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim,
 
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
         int ntensors, uint8_t cat_dim) {
-    if (ntensors <= 1) cfm_die("Not enough tensors to cat.");
+    if (ntensors <= 1) cfm_die("cfm_tensor_cat not enough tensors to cat.");
 
     /* Promote a CFM_FLOAT32 to CFM_FLOAT64 will only add a bunch of useless zeros. */
     int i = ntensors;
@@ -466,4 +466,44 @@ void cfm_tensor_print(const cfm_tensor *t, int precision) {
    }
     for (uint8_t d = 0; d < t->ndims; d++) putchar(']');
     printf(")\n");
+}
+
+/* This function checks if two tensors are broadcastable. 
+ * For now only tensors with exact same shape are considered as broadcastable, 
+ * in reality there are other cases. https://docs.pytorch.org/docs/2.13/notes/broadcasting.html#broadcasting-semantics 
+ * todo: add them later on. */
+static bool cfm_tensors_broadcastable(const cfm_tensor *u, const cfm_tensor *v) {
+    for (uint8_t i = 0; i < u->ndims; ++i)
+        if (u->shape[i] != v->shape[i]) return false;
+    return true;
+}
+
+cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tensor *v) {
+    if (u->dtype != v->dtype) cfm_die("cfm_tensor_add cannot add tensors with differents dtype.");
+    if (!cfm_tensors_broadcastable(u, v)) cfm_die("cfm_tensor_add the two tensors are not broadcastable.");
+    // if two tensors results broadcastable the new tensor t shape is calculatead as described 
+    // in https://docs.pytorch.org/docs/2.13/notes/broadcasting.html#broadcasting-semantics
+    // fow now t->shape = u->shape
+    // todo: correct shape calculation
+    cfm_tensor *t = cfm_tensor_new(name, u->dtype, u->ndims, u->shape);
+    if (!t) cfm_die("Out of memory");
+    switch (t->dtype) {
+        case CFM_FLOAT32:
+            float *f_t_data = t->data;
+            float *f_u_data = u->data;
+            float *f_v_data = v->data;
+            for (uint64_t i = 0; i < t->numel; ++i) {
+                f_t_data[i] = f_u_data[i] + f_v_data[i];
+            }
+            break;
+        case CFM_FLOAT64:
+            double *d_t_data = t->data;
+            double *d_u_data = u->data;
+            double *d_v_data = v->data;
+            for (uint64_t i = 0; i < t->numel; ++i) {
+                d_t_data[i] = d_u_data[i] + d_v_data[i];
+            }
+            break;
+    }
+    return t;
 }
