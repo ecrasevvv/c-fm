@@ -96,7 +96,10 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
  * it depends on the dim of the cfm_tensor. */
 cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t);
 
-//expand
+/* This function returns a new cfm_tensor with dimensions expanded to a larger size. */
+cfm_tensor *cfm_tensor_expand(const cfm_tensor *t, uint8_t exp_ndims,
+        const uint16_t *exp_shape);
+
 //view
 
 /* This function returns a new tensor which data is u->data + v->data. */

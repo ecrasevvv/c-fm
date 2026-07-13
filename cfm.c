@@ -25,10 +25,11 @@
 #define _2_M_PI (M_PI*2.0)
 #endif
 
-#define CFM_EPS_FLOAT32 1e-10f
-#define CFM_EPS_FLOAT64 1e-10
+#define CFM_EPS_FLOAT32 (1e-10f)
+#define CFM_EPS_FLOAT64 ( 1e-10)
 
-#define CFM_MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define CFM_MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define CFM_MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 /* Debug macro used to print a vector. */
 #define CFM_D_VEC_PRINT(V, s)                                   \
@@ -351,6 +352,21 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
     return t;
 }
 
+cfm_tensor *cfm_tensor_expand(const cfm_tensor *u, const uint8_t exp_ndims,
+        const uint16_t *exp_shape) {
+    int du = u->ndims-1;
+    for (int d = exp_ndims-1; d >= 0; d--) {
+        /* Treat the missing dimension as 1 in order to pass the second if. */
+        uint16_t us = (du >= 0) ? u->shape[du] : 1;
+        if (us != 1 && us != exp_shape[d])
+            cfm_die("cfm_tensor_expand cannot expand non-singleton dimension.");
+        du--;
+    }
+    cfm_tensor *t = cfm_tensor_new(u->name->content, u->dtype, exp_ndims, exp_shape);
+    // todo: data replication logic 
+    return t;
+}
+
 cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t) {
     CFM_ASSERT(t->ndims > 0);
     uint16_t shape[t->ndims-1];
@@ -486,29 +502,18 @@ static bool cfm_tensor_broadcast(const cfm_tensor *u, const cfm_tensor *v,
 cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tensor *v) {
     if (u->dtype != v->dtype) cfm_die("cfm_tensor_add cannot add tensors with differents dtype.");
     uint8_t ndims;
-    uint16_t shape[CFM_MAX_DIMS];
+    uint16_t shape[CFM_MAX_DIMS] = {0};
     if (!cfm_tensor_broadcast(u, v, &ndims, shape))
         cfm_die("cfm_tensor_add the two tensors are not broadcastable.");
     cfm_tensor *t = cfm_tensor_new(name, u->dtype, ndims, shape);
-    // todo: the whole logic needs to be changed
-    switch (t->dtype) {
-        case CFM_FLOAT32:
-            float *f_t_data = t->data;
-            float *f_u_data = u->data;
-            float *f_v_data = v->data;
-            for (uint64_t i = 0; i < t->numel; ++i) {
-                f_t_data[i] = f_u_data[i] + f_v_data[i];
-            }
-            break;
-        case CFM_FLOAT64:
-            double *d_t_data = t->data;
-            double *d_u_data = u->data;
-            double *d_v_data = v->data;
-            for (uint64_t i = 0; i < t->numel; ++i) {
-                d_t_data[i] = d_u_data[i] + d_v_data[i];
-            }
-            break;
-    }
+    // todo:
+    // once we get here the cfm_tensor t has the correct output shape and number of dimension
+    //
+    // now:
+    // we can expand u and v to match t->shape and t->ndims
+    // then simply t[i] = u[i] + v[i]
+    //
+    // 2x memory but way simpler imo
     return t;
 }
 
