@@ -1,3 +1,6 @@
+/* This file is deliberately vertical: it owns cfm_tensor logic and ops, 
+ * GGUF loading and FM inference. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -247,10 +250,20 @@ CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
 }
 
 /* This function returns the position for a flat idx whitin a specific dimension dim. 
- * Maps a flat idx to a N-dimensional position. */
+ * Maps a flat idx to a N-dimensional position. 
+ * note: maybe in the future this function can be replaced with cfm_tensor_unravel. */
 CFMDEF int cfm_tensor_get_position_whitin_dimension(uint64_t idx, int dim, 
-        const uint16_t strides[], const uint16_t shape[]) {
+        const uint16_t *strides, const uint16_t *shape) {
     return (idx/strides[dim]) % shape[dim];
+}
+
+/* This function converts a flat index i into an n-dimensional coordinates. */
+CFMDEF void cfm_tensor_unravel_index(uint16_t *coords, uint64_t rem,
+        const uint16_t *strides, const uint8_t ndims) {
+    for (uint8_t d = 0; d < ndims; ++d) {
+        coords[d] = rem / strides[d];
+        rem %= strides[d];
+    }
 }
 
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
@@ -306,11 +319,7 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
         case CFM_FLOAT32: {
             float *out = t->data;
             for (uint64_t i = 0; i < t->numel; i++) {
-                uint64_t rem = i;
-                for (uint8_t d = 0; d < dms; d++) {
-                    coords[d] = rem / t->strides[d];
-                    rem %= t->strides[d];
-                }
+                cfm_tensor_unravel_index(coords, i, t->strides, t->ndims);
 
                 int src = 0;
                 while (coords[cat_dim] >= boundaries[src+1]) src++;
@@ -328,11 +337,7 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
         case CFM_FLOAT64: {
             double *out = t->data;
             for (uint64_t i = 0; i < t->numel; i++) {
-                uint64_t rem = i;
-                for (uint8_t d = 0; d < dms; d++) {
-                    coords[d] = rem / t->strides[d];
-                    rem %= t->strides[d];
-                }
+                cfm_tensor_unravel_index(coords, i, t->strides, t->ndims);
 
                 int src = 0;
                 while (coords[cat_dim] >= boundaries[src+1]) src++;
@@ -363,7 +368,15 @@ cfm_tensor *cfm_tensor_expand(const cfm_tensor *u, const uint8_t exp_ndims,
         du--;
     }
     cfm_tensor *t = cfm_tensor_new(u->name->content, u->dtype, exp_ndims, exp_shape);
-    // todo: data replication logic 
+
+    /* Copy data to the new expanded tensor. */
+    switch (t->dtype) {
+        case CFM_FLOAT32:
+            break;
+        case CFM_FLOAT64:
+            break;
+    }
+
     return t;
 }
 
