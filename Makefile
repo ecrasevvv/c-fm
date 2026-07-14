@@ -11,11 +11,11 @@ NATIVE_CPU_FLAG=-march=native
 
 BASE_O=-O3
 DEBUG_O=-O0
+BENCH_O=-O3
 
-# fully optmizes
 BASE_CFLAGS=$(BASE_O) -ffast-math $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c99
-# only for correctness 
 DEBUG_CFLAGS=$(DEBUG_O) -DDEBUG -Wall -Wextra -std=c99
+BENCH_CFLAGS=$(BENCH_O) -ffast-math $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c99
 
 LDLIBS=-lm
 
@@ -27,8 +27,10 @@ help:
 	@echo "	make tc				Remove the built test version."
 	@echo "	make dc				Remove the built debug version."
 	@echo "	make bc				Remove the built bench version."
+	@echo "	make clean			Remove all the built version (test, debug, bench)."
  
 test:
+	@printf '${RED}TEST${RESET}: '
 	$(CC) $(BASE_CFLAGS) test.c cfm.c $(LDLIBS) -o $(T_TARGET) && ./$(T_TARGET)
 
 debug:
@@ -37,7 +39,7 @@ debug:
 
 bench:
 	@printf '${RED}BENCH${RESET}: '
-	$(CC) $(BASE_CFLAGS) bench.c cfm.c $(LDLIBS) -o $(B_TARGET) && ./$(B_TARGET)
+	$(CC) $(BENCH_CFLAGS) bench.c cfm.c $(LDLIBS) -o $(B_TARGET) && ./$(B_TARGET)
 
 tc: 
 	@rm -f $(T_TARGET)
@@ -47,5 +49,8 @@ dc:
 
 bc: 
 	@rm -f $(B_TARGET)
+
+clean:
+	@rm -f $(T_TARGET) $(D_TARGET) $(B_TARGET)
 
 .PHONY: help test debug bench tc dc bc
