@@ -251,7 +251,7 @@ CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
 
 /* This function converts a flat index i into an n-dimensional coordinates. */
 CFMDEF void cfm_tensor_unravel_index(uint16_t *coords, uint64_t rem,
-        const uint16_t *strides, const uint8_t ndims) {
+        const uint64_t *strides, const uint8_t ndims) {
     for (uint8_t d = 0; d < ndims; ++d) {
         coords[d] = rem / strides[d];
         rem %= strides[d];
@@ -260,7 +260,7 @@ CFMDEF void cfm_tensor_unravel_index(uint16_t *coords, uint64_t rem,
 
 /* This function does the opposite of cfm_tensor_unravel_index, given an n-dimensional
  * set of coordinates it returns the corresponding flat index i. */
-CFMDEF uint64_t cfm_tensor_ravel_index(const uint16_t *coords, const uint16_t *strides, 
+CFMDEF uint64_t cfm_tensor_ravel_index(const uint16_t *coords, const uint64_t *strides, 
         const uint8_t ndims) {
     uint64_t i = 0;
     for (uint8_t d = 0; d < ndims; ++d) {
@@ -371,14 +371,14 @@ cfm_tensor *cfm_tensor_expand(const cfm_tensor *u, const uint8_t exp_ndims,
     /* Copy data to the new expanded tensor. */
     uint16_t coords[t->ndims];
     uint16_t u_coords[u->ndims];
-    uint8_t offset = exp_ndims - u->ndims;
+    uint64_t offset = exp_ndims - u->ndims;
     switch (t->dtype) {
         case CFM_FLOAT32:
             float *f_data = t->data;
             for (uint64_t i = 0; i < t->numel; ++i) {
                 cfm_tensor_unravel_index(coords, i, t->strides, t->ndims);
                 for (uint8_t du = 0; du < u->ndims; ++du) {
-                    uint8_t d = du + offset;
+                    uint64_t d = du + offset;
                     u_coords[du] = (u->shape[du] == 1) ? 0 : coords[d];
                 }
                 uint64_t src_idx = cfm_tensor_ravel_index(u_coords, u->strides, u->ndims);
@@ -390,7 +390,7 @@ cfm_tensor *cfm_tensor_expand(const cfm_tensor *u, const uint8_t exp_ndims,
             for (uint64_t i = 0; i < t->numel; ++i) {
                 cfm_tensor_unravel_index(coords, i, t->strides, t->ndims);
                 for (uint8_t du = 0; du < u->ndims; ++du) {
-                    uint8_t d = du + offset;
+                    uint64_t d = du + offset;
                     u_coords[du] = (u->shape[du] == 1) ? 0 : coords[d];
                 }
                 uint64_t src_idx = cfm_tensor_ravel_index(u_coords, u->strides, u->ndims);
@@ -407,7 +407,7 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t) {
     for (uint8_t i = 0; i < t->ndims-1; ++i) shape[i] = t->shape[i+1];
     cfm_tensor *tt = cfm_tensor_new(t->name->content, t->dtype, t->ndims-1, shape);
     if (!tt) cfm_die("Out of memory");
-    int offset = (t->shape[0]-1) * t->strides[0];
+    uint64_t offset = (t->shape[0]-1) * t->strides[0];
     switch (tt->dtype) {
         case CFM_FLOAT32:
             float *tt_f_data = tt->data;

@@ -26,7 +26,7 @@ typedef struct {
     cfm_string *name;
     uint8_t ndims;
     uint16_t shape[CFM_MAX_DIMS];
-    uint16_t strides[CFM_MAX_DIMS];
+    uint64_t strides[CFM_MAX_DIMS];
     uint64_t numel;
     cfm_dtype dtype;
     void *data;
