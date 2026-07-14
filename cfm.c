@@ -31,8 +31,12 @@
 #define CFM_EPS_FLOAT32 (1e-10f)
 #define CFM_EPS_FLOAT64 ( 1e-10)
 
-#define CFM_MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define CFM_MIN(a, b) (((a) < (b)) ? (a) : (b))
+# ifndef CFM_MIN
+# define CFM_MIN(x,y) ((x)<(y)?(x):(y))
+# endif /* CFM_MIN */
+# ifndef CFM_MAX
+# define CFM_MAX(x,y) ((x)>(y)?(x):(y))
+# endif /* CFM_MAX */
 
 /* Debug macro used to print a vector. */
 #define CFM_D_VEC_PRINT(V, s)                                   \
