@@ -559,6 +559,8 @@ cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tens
             for (uint64_t i = 0; i < t->numel; ++i) t_d_data[i] = u_d_data[i] + v_d_data[i];
             break;
     }
+    cfm_tensor_free(u_exp);
+    cfm_tensor_free(v_exp);
     return t;
 }
 
