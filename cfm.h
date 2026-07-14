@@ -13,8 +13,8 @@ typedef enum {
 } cfm_dtype;
 
 typedef enum {
-    CFM_H_PRINT = 0,    /* Horizontal print. */
-    CFM_V_PRINT = 1,    /* Vertical print. */
+    CFM_H_PRINT = 0,
+    CFM_V_PRINT = 1,
 } cfm_print_mode;
 
 typedef struct {
@@ -24,8 +24,8 @@ typedef struct {
 
 typedef struct {
     cfm_string *name;
-    uint8_t ndims;                  /* How many dimension;                      pytorch: t.dim() */
-    uint16_t shape[CFM_MAX_DIMS];   /* How many elements for each dimension;    pytorch: t.shape */
+    uint8_t ndims;
+    uint16_t shape[CFM_MAX_DIMS];
     uint16_t strides[CFM_MAX_DIMS];
     uint64_t numel;
     cfm_dtype dtype;
@@ -102,20 +102,28 @@ cfm_tensor *cfm_tensor_expand(const cfm_tensor *t, uint8_t exp_ndims,
 
 //view
 
-/* This function returns a new tensor which data is u->data + v->data. */
+/* This function returns a new cfm_tensor t where t[i] = u[i] + v[i]. It
+ * supports broadcasting to a common shape. 
+ * Does not supports type promotion. */
 cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u,
         const cfm_tensor *v);
 
-/* This function returns a new tensor with the exponential of the 
+/* This function returns a new cfm_tensor t where t[i] = u[i] * v[i]. It
+ * supports broadcasting to a common shape.
+ * Does not supports type promotion. */
+cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v);
+
+/* This function returns a new cfm_tensor with the exponential of the 
  * elements of the input tensor u. */
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u);
-
-//mul
 
 //matmul
 
 /* This function prints out the cfm_tensor t in the pytorch style. */
 void cfm_tensor_print(const cfm_tensor *t, int precision);
+
+/* This function prints out the cfm_tensor t whitout any fancy style formatting. */
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision);
 
 #endif
