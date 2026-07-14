@@ -564,6 +564,35 @@ cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tens
     return t;
 }
 
+cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u, const cfm_tensor *v) {
+    if (u->dtype != v->dtype) cfm_die("cfm_tensor_mul cannot mul tensors with differents dtype.");
+    uint8_t ndims;
+    uint16_t shape[CFM_MAX_DIMS] = {0};
+    if (!cfm_tensor_broadcast(u, v, &ndims, shape))
+        cfm_die("cfm_tensor_mul the two tensors are not broadcastable.");
+    cfm_tensor *t = cfm_tensor_new(name, u->dtype, ndims, shape);
+    cfm_tensor *u_exp = cfm_tensor_expand(u, ndims, shape); 
+    cfm_tensor *v_exp = cfm_tensor_expand(v, ndims, shape); 
+    
+    switch (t->dtype) {
+        case CFM_FLOAT32:
+            float *t_f_data = t->data;
+            float *u_f_data = u_exp->data;
+            float *v_f_data = v_exp->data;
+            for (uint64_t i = 0; i < t->numel; ++i) t_f_data[i] = u_f_data[i] * v_f_data[i];
+            break;
+        case CFM_FLOAT64:
+            double *t_d_data = t->data;
+            double *u_d_data = u_exp->data;
+            double *v_d_data = v_exp->data;
+            for (uint64_t i = 0; i < t->numel; ++i) t_d_data[i] = u_d_data[i] * v_d_data[i];
+            break;
+    }
+    cfm_tensor_free(u_exp);
+    cfm_tensor_free(v_exp);
+    return t;
+}
+
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
     cfm_tensor *t = cfm_tensor_new(name, u->dtype, u->ndims, u->shape);
     switch (t->dtype) {
