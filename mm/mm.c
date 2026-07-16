@@ -32,7 +32,7 @@
 
 #define M 2048
 #define N 2048
-#define P 1024 
+#define P 2048 
 #define BS 2
 #define MAX_VAL 10
 #define NITER 10
@@ -118,6 +118,7 @@ void summary(void) {
     printf("ARR_TYPE_SIZE:              %zu\n", sizeof(ARR_TYPE));
     printf("Elements per L1 cache line: %d\n", (int)l1_cache/(int)sizeof(ARR_TYPE));
     printf("Block dimension:            %dx%d\n", BS, BS);
+    printf("Elements per block:         %d\n", BS*BS);
     printf("Block size (bytes):         %ld\n", sizeof(ARR_TYPE)*(BS*BS));
     printf("%s\n", HLINE);
     printf("Elements of array A: %d\n", M*N); 
@@ -155,6 +156,7 @@ int main(void) {
 
     /* matmul NITER times. */
     double best_time = 1000.0;
+    printf("GFLOPS:\t\tTIME:\n");
     for (size_t i = 0; i < NITER; ++i) {
         zero_fill(N, P, C);
         clock_gettime(CLOCK_MONOTONIC_RAW, &start);
@@ -163,7 +165,7 @@ int main(void) {
         double time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)*1e-9;
         if (time < best_time) best_time = time;
         gflops = (flops/time)*1e-9;
-        printf("GFLOPS:         %.*f\n", precision, gflops);
+        printf("%.*f\t\t%.*fs\n", precision, gflops, precision, time);
     }
     printf("%s\n", HLINE);
 
