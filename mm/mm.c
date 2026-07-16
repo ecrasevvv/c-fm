@@ -1,40 +1,15 @@
 /*
- * M=N=P=1024
- * NITER=10
- * ---------------------------------------------
- * [k-outer loop]
- *      - ./mm.sh no-warmup no-vectorization: 
- *              TIME:           ~0.25
- *              GFLOPS:         ~8.50
- *              L3 miss rate:   2.30%
+ * Theoretical maximum on single core: ~147 GFLOPS
  *
- *      - ./mm.sh warmup    no-vectorization
- *              TIME:           ~0.25
- *              GFLOPS:         ~8.50
- *              L3 miss rate:   ~1.3%
- *
- *      - ./mm.sh no-warmup vectorization
- *              TIME:           ~0.12
- *              GFLOPS:         ~17
- *              L3 miss rate:   ~2%
- *
- *      - ./mm.sh warmup    vectorization
- *              TIME:           ~0.12
- *              GFLOPS:         ~17
- *              L3 miss rate:   ~1.7%
- * ---------------------------------------------
- * [cache blocking]
- *  ./mm.sh warmup vectorization
- *
- *  | BS    | Time (s)      | GFLOPS    | Instructions (core)   | L3 Miss Rate  |
- *  |-------|---------------|-----------|-----------------------|---------------|
- *  | 2     | 0.07          | ~29       | ~11B                  | ~3%           |
- *  | 4     | 0.0963-0.0977 | 22.0-22.3 | 14.9B                 | 33.5%         |
- *  | 16    | 0.2169-0.2187 | 9.8-9.9   | 11.2B                 | 49.1%         |
- *  | 64    | 0.1592-0.1593 | 13.5      | 7.2B                  | 46.3%         |
- *  | 128   | 0.1811-0.1829 | 11.7-11.9 | 17.1B                 | 19.6%         |
- *
- *  BS=2 best
+ * Current best:
+ *      - M=N=2048
+ *      - P=1024
+ *      - B=2
+ *      - NITER=10
+ *      
+ *      ./mm.sh 1 1
+ *      Best time:          0.1451  
+ *      Best time GFLOPS:   59.2046
  */
 
 #include <stdio.h>
@@ -53,10 +28,10 @@
 #define L2_CACHE_SIZE 6.5
 #define L3_CACHE_SIZE 12
 
-#define ARR_TYPE double
+#define ARR_TYPE float
 
-#define M 1024
-#define N 1024
+#define M 2048
+#define N 2048
 #define P 1024 
 #define BS 2
 #define MAX_VAL 10
@@ -173,6 +148,11 @@ int main(void) {
     mm(N, M, A, P, B, C);
 #endif
 
+    /* Evaluation metrics */
+    const int precision = 4;
+    double flops = 2.0*M*P*N;
+    double gflops = 0.0;
+
     /* matmul NITER times. */
     double best_time = 1000.0;
     for (size_t i = 0; i < NITER; ++i) {
@@ -182,14 +162,13 @@ int main(void) {
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         double time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)*1e-9;
         if (time < best_time) best_time = time;
+        gflops = (flops/time)*1e-9;
+        printf("GFLOPS:         %.*f\n", precision, gflops);
     }
+    printf("%s\n", HLINE);
 
-    /* Evaluation metrics */
-    const int precision = 4;
-    double flops = 2.0*M*P*N;
-    double gflops = (flops/best_time)*1e-9;
-    printf("Best time:      %.*f\n", precision, best_time);
-    printf("GFLOPS:         %.*f\n", precision, gflops);
+    printf("Best time:          %.*f\n", precision, best_time);
+    printf("Best time GFLOPS:   %.*f\n", precision, (flops/best_time)*1e-9);
     printf("%s\n", HLINE);
 
     free(A); free(B); free(C);
