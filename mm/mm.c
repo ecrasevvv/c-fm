@@ -1,16 +1,10 @@
 /*
- * Theoretical maximum on single core: ~147 GFLOPS
- * numpy archives: 
+ * M=N=512
+ * K=256
  *
- * Current best:
- *      - M=N=2048
- *      - P=1024
- *      - B=2
- *      - NITER=10
- *      
- *      ./mm.sh 1 1
- *      Best time:          0.1451  
- *      Best time GFLOPS:   59.2046
+ * Theoretical maximum on single core:  ~147 GFLOPS
+ * numpy archives (single-core):        ~100 GFLOPS
+ * Current best:                        nd
  */
 
 #include <stdio.h>
