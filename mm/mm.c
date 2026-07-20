@@ -112,28 +112,28 @@ void baseline(const ARR_TYPE *A, const ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
 /* AVX2 CPU contains 16 YMM registers.
  * Each YMM register can store up to 8 floats (256 bits in total).
  *
- * Compute an m_{r} x n_{r} sub-matrix \tilde{C} of C. Where r denotes "register".
+ * Compute an m_{r} x n_{r} sub-matrix _C of C. Where r denotes "register".
  *
  * Considering:
- *  - \tilde{C} of size m_{r}   x n_{r} is equals to:
- *  - \tilde{A} of size m_{r}   x K
- *  - \tilde{B} of size K       x r_{r}
+ *  - _C of size m_{r}   x n_{r} is equals to:
+ *  - _A of size m_{r}   x K
+ *  - _B of size K       x r_{r}
  *
- * \tilde{C} = \tilde{A}\tilde{B}
+ * _C = _A _B
  *
- * Zero-init the \tilde{C} accumulator, load 1 column of \tilde{A} and one row
- * of \tilde{B}. After K iterations the computation of \tilde{C} is completed
+ * Zero-init the _C accumulator, load 1 column of _A and one row
+ * of _B. After K iterations the computation of _C is completed
  * computing the outer product of the two loaded vectors.
  *
  * In this case "load" means load from RAM to YMM registers. Each column of the 
- * accumulator \tilde{C} can spans over more than 1 YMM register, the same goes
- * for the \tilde{A} column vector.
+ * accumulator _C can spans over more than 1 YMM register, the same goes
+ * for the _A column vector.
  *
  * m_{r} must be divisible by 8.
  *
- * (m_{r}/8)*n_{r}  = total YMM registers needed to store the accumulator \tilde{C}
- * m_{r}/8          = total YMM registers needed to store the \tilde{A} col-vector
- * 1                = total YMM registers needed to store the \tilde{B} row-vector single broadcasted value
+ * (m_{r}/8)*n_{r}  = total YMM registers needed to store the accumulator _C
+ * m_{r}/8          = total YMM registers needed to store the _A col-vector
+ * 1                = total YMM registers needed to store the _B row-vector single broadcasted value
  *
  * (m_{r}/8 * n_{r} + m_{r}/8 + 1) <= 16
  *
