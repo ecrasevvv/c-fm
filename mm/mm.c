@@ -105,6 +105,24 @@ void memory_per_array(const char *name, size_t rows, size_t cols) {
             bytes_per_word * ((double)rows*cols / 1024.0/1024.0/1024.0));
 }
 
+#define MAX_DIFFERENCE 1e-3
+void check(ARR_TYPE *__restrict__ C, ARR_TYPE *__restrict__ _C) {
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t j = 0; j < N; ++j) {
+            float cij = C[idx(j,M,i)];
+            float _cij = _C[idx(j,M,i)];
+            float diff = cij - _cij;
+            if (fabsf(diff) > MAX_DIFFERENCE) {
+                printf("NO MATCH: %f - %f = %f\n", cij, _cij, diff);
+                printf("%s\n", HLINE);
+                break;
+            }
+        }
+    }
+    printf("MATCH\n");
+    printf("%s\n", HLINE);
+}
+
 void summary(void) {
 #if defined(__AVX2__)
     printf("Running AVX2 instructions.\n");
@@ -159,6 +177,15 @@ int main(void) {
 #ifdef WARMUP
     memset(C, 0, M*N*sizeof(ARR_TYPE));
     mm(A, B, C);
+#endif
+
+#ifdef DEBUG
+    memset(C, 0, M*N*sizeof(ARR_TYPE));
+    ARR_TYPE *_C = (ARR_TYPE*)malloc(sizeof(ARR_TYPE) * M*N);
+    baseline(A, B, _C);
+    mm(A, B, C);
+    check(C, _C);
+    free(_C);
 #endif
 
     /* Evaluation metrics */
