@@ -6,11 +6,14 @@ D_CFLAGS = -O3 -march=native -mno-avx512f -Wall -Wextra -DDEBUG
 D_TARGET = dmm
 S_CFLAGS = -O3 -march=native -mno-avx512f -Wall -Wextra -DDEBUG -S
 S_TARGET = smm
+M_CFLAGS = -O3 -fopenmp=libomp -march=native -mno-avx512f -Wall -Wextra -DMULTI_THREADS
+M_TARGET = mmm
 PERF_FLAGS = cycles,instructions,LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses
 
 help:
 	@echo "make mm: 		Compile, run and perf mm.c"
 	@echo "make dmm: 		Compile, run and perf mm.c debug version (contains matrix print)"
+	@echo "make mmm: 		Compile, run and perf mm.c multi-thread version"
 	@echo "make smm: 		Get assembly code (with SIMD FMA instruction) from mm.c"
 	@echo "make clean: 		Remove build outputs"
 
@@ -20,10 +23,13 @@ $(TARGET):
 $(D_TARGET):
 	$(CC) $(D_CFLAGS) $(SOURCES) -o $(D_TARGET) && perf stat -e $(PERF_FLAGS) ./$(D_TARGET)
 
+$(M_TARGET):
+	$(CC) $(M_CFLAGS) $(SOURCES) -o $(M_TARGET) && perf stat -e $(PERF_FLAGS) ./$(M_TARGET)
+
 $(S_TARGET):
 	$(CC) $(S_CFLAGS) $(SOURCES) -o $(S_TARGET)
 
 clean: 
-	rm -f $(TARGET) $(D_TARGET) $(S_TARGET)
+	rm -f $(TARGET) $(D_TARGET) $(M_TARGET) $(S_TARGET)
 
-.PHONY: help $(TARGET) $(D_TARGET) $(S_TARGET) clean
+.PHONY: help $(TARGET) $(D_TARGET) $(M_TARGET) $(S_TARGET) clean
