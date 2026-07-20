@@ -31,7 +31,7 @@
 #define N 512
 #define K 256 
 #define BS 8
-#define MAX_VAL 10
+#define MAX_VAL 10.f
 #define NITER 10
 
 #ifdef __AVX2__
@@ -51,7 +51,7 @@ struct timespec start, end;
 void fill(size_t rows, size_t cols, ARR_TYPE *m) {
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            m[idx(j,rows,i)] = rand()%MAX_VAL;
+            m[idx(j,rows,i)] =  ((float)rand()/(float)(RAND_MAX))*MAX_VAL;
         }
     }
 }
