@@ -56,7 +56,7 @@
 
 #ifdef MULTI_THREADS
 #include <omp.h>
-#define NTHREADS 12
+#define NTHREADS 4
 #endif
 
 /* Col-major indexing */
@@ -266,8 +266,8 @@ int main(void) {
     ARR_TYPE *C = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * M*N);
     if (!A || !B || !C) exit(EXIT_FAILURE);
     if (is_aligned(A, L1_CACHE_SIZE)) printf("A aligned.\n");
-    if (is_aligned(A, L1_CACHE_SIZE)) printf("B aligned.\n");
-    if (is_aligned(A, L1_CACHE_SIZE)) printf("C aligned.\n");
+    if (is_aligned(B, L1_CACHE_SIZE)) printf("B aligned.\n");
+    if (is_aligned(C, L1_CACHE_SIZE)) printf("C aligned.\n");
 
     /* Summary: array sizes, number of elements, etc. */
     summary();
