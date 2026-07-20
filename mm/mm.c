@@ -1,9 +1,26 @@
 /*
+ * i5-1335U specs: https://www.intel.com/content/www/us/en/products/sku/232153/intel-core-i51335u-processor-12m-cache-up-to-4-60-ghz/specifications.html
+ *
  * M=512,N=504,K=256
  *
  * Theoretical maximum on single core:  ~147 GFLOPS
  * numpy archives (single-core):        ~125 GFLOPS (10 NITER)
  * Current best:                        ~123 GFLOPS (10 NITER) 
+ *
+ * 10 cores in total: 2 P-core and 8 E-core. Both supports AVX2 instructions.
+ * https://en.wikipedia.org/wiki/Raptor_Lake
+ *
+ * Maximum P-core Turbo frequency: 4.6Ghz
+ * Maximum E-core Turbo frequency: 3.4Ghz
+ *
+ * Considering running always at the top frequency:
+ *  - theoretical maximum of P-cores (combined): ~294 GFLOPS
+ *  - theoretical maximum of E-cores (combined): ~870 GFLOPS
+ *
+ * So the theoretical maximum on mult-core will be: ~1164 GFLOPS
+ * 
+ * numpy archives (12 threads):         ~420 GFLOPS (10 NITER)
+ * Current best (12 threads):           ~410 GFLOPS (10 NITER)
  */
 
 #include <stdio.h>
@@ -36,6 +53,11 @@
 #define K 256 
 #define MAX_VAL 10.f
 #define NITER 10
+
+#ifdef MULTI_THREADS
+#include <omp.h>
+#define NTHREADS 12
+#endif
 
 /* Col-major indexing */
 #define idx(i, rows, j) (((i)*rows)+(j))
@@ -163,6 +185,7 @@ void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
 
 void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
+    #pragma omp parallel for collapse(2) num_threads(NTHREADS)
     for (size_t i = 0; i < M; i+=MR) {
         for (size_t j = 0; j < N; j+=NR) {
             kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
@@ -199,6 +222,11 @@ void check(ARR_TYPE *__restrict__ C, ARR_TYPE *__restrict__ _C) {
 void summary(void) {
 #ifdef __AVX2__
     printf("Running AVX2 instructions.\n");
+#endif
+#ifdef MULTI_THREADS
+    printf("Running on: %d threads.\n", NTHREADS);
+#else
+    printf("Running on: 1 thread.\n");
 #endif
     printf("%s\n", HLINE);
     printf("L1i_CACHE_SIZE:             %d Kib\n", L1i_CACHE_SIZE);
