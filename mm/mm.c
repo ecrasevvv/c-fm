@@ -3,11 +3,12 @@
  *
  * Theoretical maximum on single core:  ~147 GFLOPS
  * numpy archives (single-core):        ~125 GFLOPS (10 NITER)
- * Current best:                        ~100 GFLOPS (10 NITER) 
+ * Current best:                        ~123 GFLOPS (10 NITER) 
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include <time.h>
 #include <unistd.h>
@@ -24,6 +25,10 @@
 #define L2_CACHE_SIZE 6.5
 #define L3_CACHE_SIZE 12
 
+#if defined(__linux__)
+#define L1_CACHE_SIZE (sysconf(_SC_LEVEL1_DCACHE_LINESIZE))
+#endif
+
 #define ARR_TYPE float
 
 #define M 512
@@ -32,10 +37,12 @@
 #define MAX_VAL 10.f
 #define NITER 10
 
-/* IDX formula = i*rows + j where:
- *      - i = col index of the related matrix
- *      - j = row index of the related matrix */
+/* Col-major indexing */
 #define idx(i, rows, j) (((i)*rows)+(j))
+
+/* https://stackoverflow.com/questions/1898153/how-to-determine-if-memory-is-aligned */
+#define is_aligned(POINTER, BYTE_COUNT) \
+    (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
 #define HLINE "--------------------------------------------------------------------------------"
 #define INDENT ((int)(log10(((double)MAX_VAL))))
@@ -193,21 +200,18 @@ void summary(void) {
 #ifdef __AVX2__
     printf("Running AVX2 instructions.\n");
 #endif
-#if defined(__linux__)
-    const long int l1_cache = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
-#endif
     printf("%s\n", HLINE);
     printf("L1i_CACHE_SIZE:             %d Kib\n", L1i_CACHE_SIZE);
     printf("L1d_CACHE_SIZE:             %d Kib\n", L1d_CACHE_SIZE);
     printf("L2_CACHE_SIZE:              %.1f Mib\n", L2_CACHE_SIZE);
     printf("L3_CACHE_SIZE:              %d Mib\n", L3_CACHE_SIZE);
 #if defined(__linux__)
-    printf("L1_DCACHE_LINESIZE:         %ld\n", l1_cache);
+    printf("L1_DCACHE_LINESIZE:         %ld\n", L1_CACHE_SIZE);
 #endif
     printf("%s\n", HLINE);
     printf("ARR_TYPE_SIZE:              %zu\n", sizeof(ARR_TYPE));
 #if defined(__linux__)
-    printf("Elements per L1 cache line: %d\n", (int)l1_cache/(int)sizeof(ARR_TYPE));
+    printf("Elements per L1 cache line: %d\n", (int)L1_CACHE_SIZE/(int)sizeof(ARR_TYPE));
 #endif
     printf("Kernel size:                %dx%d\n", MR, NR);
     printf("%s\n", HLINE);
@@ -222,16 +226,20 @@ void summary(void) {
 }
 
 int main(void) {
+    assert(M%MR==0 && N%NR==0);
 #ifndef __AVX2__
     fprintf(stderr, "AVX2 not supported.");
     exit(EXIT_FAILURE);
 #endif
     /* the pointer returned from malloc is suitably alligned
      * https://pubs.opengroup.org/onlinepubs/7908799/xsh/malloc.html */
-    ARR_TYPE *A = (ARR_TYPE*)malloc(sizeof(ARR_TYPE) * M*K);
-    ARR_TYPE *B = (ARR_TYPE*)malloc(sizeof(ARR_TYPE) * K*N);
-    ARR_TYPE *C = (ARR_TYPE*)malloc(sizeof(ARR_TYPE) * M*N);
+    ARR_TYPE *A = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * M*K);
+    ARR_TYPE *B = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * K*N);
+    ARR_TYPE *C = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * M*N);
     if (!A || !B || !C) exit(EXIT_FAILURE);
+    if (is_aligned(A, L1_CACHE_SIZE)) printf("A aligned.\n");
+    if (is_aligned(A, L1_CACHE_SIZE)) printf("B aligned.\n");
+    if (is_aligned(A, L1_CACHE_SIZE)) printf("C aligned.\n");
 
     /* Summary: array sizes, number of elements, etc. */
     summary();
@@ -282,8 +290,8 @@ int main(void) {
     printf("%s\n", HLINE);
 
     /* Otherwise clang with -O3 will assume that C is "dead" and delete all the FMA istructions */
-    volatile ARR_TYPE sink = C[0];
-    (void)sink;
+    //volatile ARR_TYPE sink = C[0];
+    //(void)sink;
     free(A); free(B); free(C);
     exit(EXIT_SUCCESS);
 }
