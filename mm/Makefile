@@ -6,9 +6,9 @@ D_CFLAGS = -O3 -march=native -mno-avx512f -Wall -Wextra -DDEBUG
 D_TARGET = dmm
 S_CFLAGS = -O3 -march=native -mno-avx512f -Wall -Wextra -DDEBUG -S
 S_TARGET = smm
-M_CFLAGS = -O3 -fopenmp=libomp -march=native -mno-avx512f -Wall -Wextra -DMULTI_THREADS
+M_CFLAGS = -O3 -fopenmp=libomp -march=native -mno-avx512f -Wall -Wextra -DNTHREADS=12
 M_TARGET = mmm
-DM_CFLAGS = -O3 -fopenmp=libomp -march=native -mno-avx512f -Wall -Wextra -DMULTI_THREADS -DDEBUG
+DM_CFLAGS = -O3 -fopenmp=libomp -march=native -mno-avx512f -Wall -Wextra -DNTHREADS=12 -DDEBUG
 DM_TARGET = dmmm
 PERF_FLAGS = cycles,instructions,LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses
 
