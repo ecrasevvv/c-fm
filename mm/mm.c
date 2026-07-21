@@ -144,8 +144,8 @@ void baseline(const ARR_TYPE *A, const ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
  *
  * for example: m_{r}=8 and n_{r}=12
  */
-#define MR 16
-#define NR 6
+//#define MR 16
+//#define NR 6 
 __attribute__((noinline))
 void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[6][2] = {};
@@ -188,22 +188,127 @@ void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
+//#define MR 8
+//#define NR 14
 __attribute__((noinline))
-void kernel_8x8(float *A_start, float *B_start, float *__restrict__ C_start) {
-    //__m256 acc[][] = {};
+void kernel_8x14(float *A_start, float *B_start, float *__restrict__ C_start) {
+    __m256 acc[14] = {};
     __m256 a0;
     __m256 b_broadcast;
 
     for (size_t p = 0; p < K; ++p) {
+        a0 = _mm256_loadu_ps(&A_start[p*M]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[p]);
+        acc[0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(1,K,p)]);
+        acc[1] = _mm256_fmadd_ps(a0, b_broadcast, acc[1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(2,K,p)]);
+        acc[2] = _mm256_fmadd_ps(a0, b_broadcast, acc[2]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(3,K,p)]);
+        acc[3] = _mm256_fmadd_ps(a0, b_broadcast, acc[3]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(4,K,p)]);
+        acc[4] = _mm256_fmadd_ps(a0, b_broadcast, acc[4]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(5,K,p)]);
+        acc[5] = _mm256_fmadd_ps(a0, b_broadcast, acc[5]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(6,K,p)]);
+        acc[6] = _mm256_fmadd_ps(a0, b_broadcast, acc[6]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(7,K,p)]);
+        acc[7] = _mm256_fmadd_ps(a0, b_broadcast, acc[7]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(8,K,p)]);
+        acc[8] = _mm256_fmadd_ps(a0, b_broadcast, acc[8]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(9,K,p)]);
+        acc[9] = _mm256_fmadd_ps(a0, b_broadcast, acc[9]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(10,K,p)]);
+        acc[10] = _mm256_fmadd_ps(a0, b_broadcast, acc[10]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(11,K,p)]);
+        acc[11] = _mm256_fmadd_ps(a0, b_broadcast, acc[11]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(12,K,p)]);
+        acc[12] = _mm256_fmadd_ps(a0, b_broadcast, acc[12]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(13,K,p)]);
+        acc[13] = _mm256_fmadd_ps(a0, b_broadcast, acc[13]);
+    }
+
+    for (size_t j = 0; j < 14; ++j) {
+        _mm256_storeu_ps(&C_start[j * M], acc[j]);
     }
 }
+
+#define MR 8
+#define NR 12
+__attribute__((noinline))
+void kernel_8x12(float *A_start, float *B_start, float *__restrict__ C_start) {
+    __m256 acc[12] = {};
+    __m256 a0;
+    __m256 b_broadcast;
+
+    for (size_t p = 0; p < K; ++p) {
+        a0 = _mm256_loadu_ps(&A_start[p*M]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[p]);
+        acc[0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(1,K,p)]);
+        acc[1] = _mm256_fmadd_ps(a0, b_broadcast, acc[1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(2,K,p)]);
+        acc[2] = _mm256_fmadd_ps(a0, b_broadcast, acc[2]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(3,K,p)]);
+        acc[3] = _mm256_fmadd_ps(a0, b_broadcast, acc[3]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(4,K,p)]);
+        acc[4] = _mm256_fmadd_ps(a0, b_broadcast, acc[4]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(5,K,p)]);
+        acc[5] = _mm256_fmadd_ps(a0, b_broadcast, acc[5]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(6,K,p)]);
+        acc[6] = _mm256_fmadd_ps(a0, b_broadcast, acc[6]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(7,K,p)]);
+        acc[7] = _mm256_fmadd_ps(a0, b_broadcast, acc[7]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(8,K,p)]);
+        acc[8] = _mm256_fmadd_ps(a0, b_broadcast, acc[8]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(9,K,p)]);
+        acc[9] = _mm256_fmadd_ps(a0, b_broadcast, acc[9]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(10,K,p)]);
+        acc[10] = _mm256_fmadd_ps(a0, b_broadcast, acc[10]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(11,K,p)]);
+        acc[11] = _mm256_fmadd_ps(a0, b_broadcast, acc[11]);
+    }
+
+    for (size_t j = 0; j < 12; ++j) {
+        _mm256_storeu_ps(&C_start[j * M], acc[j]);
+    }
+}
+    
 
 void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
     #pragma omp parallel for collapse(2) num_threads(NTHREADS)
     for (size_t i = 0; i < M; i+=MR) {
         for (size_t j = 0; j < N; j+=NR) {
-            kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            //kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            //kernel_8x14(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            kernel_8x12(&A[i], &B[j*K], &C[idx(j,M,i)]);
         }
     }
 }
@@ -243,12 +348,12 @@ void summary(void) {
 #else
     printf("Running on: 1 thread.\n");
 #endif
+#if defined(__linux__)
     printf("%s\n", HLINE);
     printf("L1i_CACHE_SIZE:             %d Kib\n", L1_ICACHE_SIZE);
     printf("L1d_CACHE_SIZE:             %d Kib\n", L1_DCACHE_SIZE);
     printf("L2_CACHE_SIZE:              %.1f Mib\n", L2_CACHE_SIZE);
     printf("L3_CACHE_SIZE:              %ld Mib\n", L3_CACHE_SIZE);
-#if defined(__linux__)
     printf("L1_DCACHE_LINESIZE:         %ld\n", L1_DCACHE_LINESIZE);
 #endif
     printf("%s\n", HLINE);
