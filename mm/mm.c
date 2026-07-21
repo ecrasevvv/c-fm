@@ -20,7 +20,7 @@
  * So the theoretical maximum on mult-core will be: ~1164 GFLOPS
  * 
  * numpy archives (12 threads):         ~420 GFLOPS (10 NITER)
- * Current best (12 threads):           ~410 GFLOPS (10 NITER)
+ * Current best (12 threads):           ~435 GFLOPS (10 NITER)
  */
 
 #include <stdio.h>
@@ -37,13 +37,17 @@
 #endif
 
 /* i5-1335U */
-#define L1d_CACHE_SIZE 576
-#define L1i_CACHE_SIZE 352
-#define L2_CACHE_SIZE 6.5
-#define L3_CACHE_SIZE 12
-
 #if defined(__linux__)
-#define L1_CACHE_SIZE (sysconf(_SC_LEVEL1_DCACHE_LINESIZE))
+#define L1_DCACHE_LINESIZE (sysconf(_SC_LEVEL1_DCACHE_LINESIZE))
+/* Hardcoded, read L2_CACHE_SIZE below */
+#define L1_DCACHE_SIZE 352
+#define L1_ICACHE_SIZE 576
+/* getconf LEVEL2_CACHE_SIZE reports the L2 size visible to the specific CPU core it happened to be scheduled on. 
+ * E-cores: 2Mib, P-cores: 1.2Mib, not deterministic behavior. That's why it is hardcoded. 
+ * Run $lscpu | grep cache to get the total ammount and the number of instances */
+//#define L2_CACHE_SIZE ((sysconf(_SC_LEVEL2_CACHE_SIZE))/1024.0/1024.0)
+#define L2_CACHE_SIZE 6.5
+#define L3_CACHE_SIZE ((sysconf(_SC_LEVEL3_CACHE_SIZE))/1024/1024)
 #endif
 
 #define ARR_TYPE float
@@ -52,11 +56,12 @@
 #define N 504
 #define K 256 
 #define MAX_VAL 10.f
+#define WARMUPS 20
 #define NITER 10
 
-#ifdef MULTI_THREADS
+#ifdef MULTI_THREAD
 #include <omp.h>
-#define NTHREADS 4
+#define NTHREADS 12
 #endif
 
 /* Col-major indexing */
@@ -183,6 +188,16 @@ void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
+__attribute__((noinline))
+void kernel_8x8(float *A_start, float *B_start, float *__restrict__ C_start) {
+    //__m256 acc[][] = {};
+    __m256 a0;
+    __m256 b_broadcast;
+
+    for (size_t p = 0; p < K; ++p) {
+    }
+}
+
 void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
     #pragma omp parallel for collapse(2) num_threads(NTHREADS)
@@ -223,23 +238,23 @@ void summary(void) {
 #ifdef __AVX2__
     printf("Running AVX2 instructions.\n");
 #endif
-#ifdef MULTI_THREADS
+#ifdef MULTI_THREAD
     printf("Running on: %d threads.\n", NTHREADS);
 #else
     printf("Running on: 1 thread.\n");
 #endif
     printf("%s\n", HLINE);
-    printf("L1i_CACHE_SIZE:             %d Kib\n", L1i_CACHE_SIZE);
-    printf("L1d_CACHE_SIZE:             %d Kib\n", L1d_CACHE_SIZE);
+    printf("L1i_CACHE_SIZE:             %d Kib\n", L1_ICACHE_SIZE);
+    printf("L1d_CACHE_SIZE:             %d Kib\n", L1_DCACHE_SIZE);
     printf("L2_CACHE_SIZE:              %.1f Mib\n", L2_CACHE_SIZE);
-    printf("L3_CACHE_SIZE:              %d Mib\n", L3_CACHE_SIZE);
+    printf("L3_CACHE_SIZE:              %ld Mib\n", L3_CACHE_SIZE);
 #if defined(__linux__)
-    printf("L1_DCACHE_LINESIZE:         %ld\n", L1_CACHE_SIZE);
+    printf("L1_DCACHE_LINESIZE:         %ld\n", L1_DCACHE_LINESIZE);
 #endif
     printf("%s\n", HLINE);
     printf("ARR_TYPE_SIZE:              %zu\n", sizeof(ARR_TYPE));
 #if defined(__linux__)
-    printf("Elements per L1 cache line: %d\n", (int)L1_CACHE_SIZE/(int)sizeof(ARR_TYPE));
+    printf("Elements per L1 cache line: %d\n", (int)L1_DCACHE_LINESIZE/(int)sizeof(ARR_TYPE));
 #endif
     printf("Kernel size:                %dx%d\n", MR, NR);
     printf("%s\n", HLINE);
@@ -261,13 +276,13 @@ int main(void) {
 #endif
     /* the pointer returned from malloc is suitably alligned
      * https://pubs.opengroup.org/onlinepubs/7908799/xsh/malloc.html */
-    ARR_TYPE *A = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * M*K);
-    ARR_TYPE *B = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * K*N);
-    ARR_TYPE *C = (ARR_TYPE*)aligned_alloc(L1_CACHE_SIZE, sizeof(ARR_TYPE) * M*N);
+    ARR_TYPE *A = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M*K);
+    ARR_TYPE *B = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * K*N);
+    ARR_TYPE *C = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M*N);
     if (!A || !B || !C) exit(EXIT_FAILURE);
-    if (is_aligned(A, L1_CACHE_SIZE)) printf("A aligned.\n");
-    if (is_aligned(B, L1_CACHE_SIZE)) printf("B aligned.\n");
-    if (is_aligned(C, L1_CACHE_SIZE)) printf("C aligned.\n");
+    if (is_aligned(A, L1_DCACHE_LINESIZE)) printf("A aligned.\n");
+    if (is_aligned(B, L1_DCACHE_LINESIZE)) printf("B aligned.\n");
+    if (is_aligned(C, L1_DCACHE_LINESIZE)) printf("C aligned.\n");
 
     /* Summary: array sizes, number of elements, etc. */
     summary();
@@ -276,11 +291,14 @@ int main(void) {
     fill(M, K, A);
     fill(K, N, B);
 
-    /* cache warmup matmul. */
-#ifdef WARMUP
-    memset(C, 0, M*N*sizeof(ARR_TYPE));
-    mm(A, B, C);
+#ifdef MULTI_THREAD
+    #pragma omp parallel num_threads(NTHREADS)
 #endif
+    /* Cache warmup */
+    for (size_t w = 0; w < WARMUPS; ++w) {
+        memset(C, 0, M*N*sizeof(ARR_TYPE));
+        mm(A, B, C);
+    }
 
 #ifdef DEBUG
     memset(C, 0, M*N*sizeof(ARR_TYPE));
@@ -318,8 +336,8 @@ int main(void) {
     printf("%s\n", HLINE);
 
     /* Otherwise clang with -O3 will assume that C is "dead" and delete all the FMA istructions */
-    //volatile ARR_TYPE sink = C[0];
-    //(void)sink;
+    volatile ARR_TYPE sink = C[0];
+    (void)sink;
     free(A); free(B); free(C);
     exit(EXIT_SUCCESS);
 }
