@@ -247,8 +247,8 @@ void kernel_8x14(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
-#define MR 8
-#define NR 12
+//#define MR 8
+//#define NR 12
 __attribute__((noinline))
 void kernel_8x12(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[12] = {};
@@ -299,7 +299,44 @@ void kernel_8x12(float *A_start, float *B_start, float *__restrict__ C_start) {
         _mm256_storeu_ps(&C_start[j * M], acc[j]);
     }
 }
-    
+
+#define MR 32
+#define NR 2 
+__attribute__((noinline))
+void kernel_32x2(float *A_start, float *B_start, float *__restrict__ C_start) {
+    __m256 acc[2][4] = {};
+    __m256 a0;
+    __m256 a1;
+    __m256 a2;
+    __m256 a3;
+    __m256 b_broadcast;
+
+    for (size_t p = 0; p < K; ++p) {
+        a0 = _mm256_loadu_ps(&A_start[p*M        ]);
+        a1 = _mm256_loadu_ps(&A_start[idx(p,M,8) ]);
+        a2 = _mm256_loadu_ps(&A_start[idx(p,M,16)]);
+        a3 = _mm256_loadu_ps(&A_start[idx(p,M,24)]);
+
+        b_broadcast = _mm256_loadu_ps(&B_start[p]);
+        acc[0][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0][0]);
+        acc[0][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[0][1]);
+        acc[0][2] = _mm256_fmadd_ps(a2, b_broadcast, acc[0][2]);
+        acc[0][3] = _mm256_fmadd_ps(a3, b_broadcast, acc[0][3]);
+
+        b_broadcast = _mm256_loadu_ps(&B_start[idx(1,K,p)]);
+        acc[1][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[1][0]);
+        acc[1][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[1][1]);
+        acc[1][2] = _mm256_fmadd_ps(a2, b_broadcast, acc[1][2]);
+        acc[1][3] = _mm256_fmadd_ps(a3, b_broadcast, acc[1][3]);
+    }
+
+    for (size_t j = 0; j < 2; ++j) {
+        _mm256_storeu_ps(&C_start[j * M], acc[j][0]);
+        _mm256_storeu_ps(&C_start[idx(j,M,8)], acc[j][1]);
+        _mm256_storeu_ps(&C_start[idx(j,M,16)], acc[j][2]);
+        _mm256_storeu_ps(&C_start[idx(j,M,24)], acc[j][3]);
+    }
+}
 
 void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
@@ -308,7 +345,8 @@ void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
         for (size_t j = 0; j < N; j+=NR) {
             //kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
             //kernel_8x14(&A[i], &B[j*K], &C[idx(j,M,i)]);
-            kernel_8x12(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            //kernel_8x12(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            kernel_32x2(&A[i], &B[j*K], &C[idx(j,M,i)]);
         }
     }
 }
