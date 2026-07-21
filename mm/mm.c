@@ -52,16 +52,30 @@
 
 #define ARR_TYPE float
 
-#define M 512
-#define N 504
-#define K 256 
-#define MAX_VAL 10.f
+/* Raw dimensions. M and N are auto-padded to multiples of MR/NR. */
+#define M_RAW 513
+#define N_RAW 505
+#define K 257
+/* Note: changing these values according to the presents kernel_*x* micro-kernels functions */
+#define MR 16
+#define NR 6
+
+#define M_PAD(n) ((n) % MR ? (n) + MR - ((n) % MR) : (n))
+#define N_PAD(n) ((n) % NR ? (n) + NR - ((n) % NR) : (n))
+
+#define M M_PAD(M_RAW)
+#define N N_PAD(N_RAW)
+
+#define MAX_VAL 1.f
 #define WARMUPS 20
 #define NITER 10
 
-#ifdef MULTI_THREAD
+#ifdef _OPENMP
 #include <omp.h>
-#define NTHREADS 12
+#endif
+
+#ifndef NTHREADS
+#define NTHREADS 1
 #endif
 
 /* Col-major indexing */
@@ -79,7 +93,7 @@ struct timespec start, end;
 void fill(size_t rows, size_t cols, ARR_TYPE *m) {
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            m[idx(j,rows,i)] =  ((float)rand()/(float)(RAND_MAX))*MAX_VAL;
+            m[idx(j,rows,i)] =  ((ARR_TYPE)rand()/(ARR_TYPE)(RAND_MAX))*MAX_VAL;
         }
     }
 }
@@ -144,8 +158,6 @@ void baseline(const ARR_TYPE *A, const ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
  *
  * for example: m_{r}=8 and n_{r}=12
  */
-//#define MR 16
-//#define NR 6 
 __attribute__((noinline))
 void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[6][2] = {};
@@ -188,8 +200,6 @@ void kernel_16x6(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
-//#define MR 8
-//#define NR 14
 __attribute__((noinline))
 void kernel_8x14(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[14] = {};
@@ -247,8 +257,6 @@ void kernel_8x14(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
-//#define MR 8
-//#define NR 12
 __attribute__((noinline))
 void kernel_8x12(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[12] = {};
@@ -300,8 +308,6 @@ void kernel_8x12(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
-#define MR 32
-#define NR 2 
 __attribute__((noinline))
 void kernel_32x2(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[2][4] = {};
@@ -338,15 +344,39 @@ void kernel_32x2(float *A_start, float *B_start, float *__restrict__ C_start) {
     }
 }
 
+static ARR_TYPE *pad_rows(const ARR_TYPE *src, size_t rows_raw, size_t cols,
+        size_t align, size_t *rows_padded) {
+    size_t add = (rows_raw % align) ? align - (rows_raw % align) : 0;
+    *rows_padded = rows_raw + add;
+    if (!add) return NULL;
+    ARR_TYPE *dst = (ARR_TYPE*)calloc((*rows_padded) * cols, sizeof(ARR_TYPE));
+    if (!dst) exit(EXIT_FAILURE);
+    for (size_t j = 0; j < cols; ++j)
+        memcpy(&dst[j * (*rows_padded)], &src[j * rows_raw], rows_raw * sizeof(ARR_TYPE));
+    return dst;
+}
+
+static ARR_TYPE *pad_cols(const ARR_TYPE *src, size_t rows, size_t cols_raw,
+        size_t align, size_t *cols_padded) {
+    size_t add = (cols_raw % align) ? align - (cols_raw % align) : 0;
+    *cols_padded = cols_raw + add;
+    if (!add) return NULL;
+    ARR_TYPE *dst = (ARR_TYPE*)calloc(rows * (*cols_padded), sizeof(ARR_TYPE));
+    if (!dst) exit(EXIT_FAILURE);
+    for (size_t j = 0; j < cols_raw; ++j)
+        memcpy(&dst[j * rows], &src[j * rows], rows * sizeof(ARR_TYPE));
+    return dst;
+}
+
 void mm(ARR_TYPE *A, ARR_TYPE *B, ARR_TYPE *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
     #pragma omp parallel for collapse(2) num_threads(NTHREADS)
     for (size_t i = 0; i < M; i+=MR) {
         for (size_t j = 0; j < N; j+=NR) {
-            //kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
             //kernel_8x14(&A[i], &B[j*K], &C[idx(j,M,i)]);
             //kernel_8x12(&A[i], &B[j*K], &C[idx(j,M,i)]);
-            kernel_32x2(&A[i], &B[j*K], &C[idx(j,M,i)]);
+            //kernel_32x2(&A[i], &B[j*K], &C[idx(j,M,i)]);
         }
     }
 }
@@ -381,7 +411,7 @@ void summary(void) {
 #ifdef __AVX2__
     printf("Running AVX2 instructions.\n");
 #endif
-#ifdef MULTI_THREAD
+#ifdef _OPENMP
     printf("Running on: %d threads.\n", NTHREADS);
 #else
     printf("Running on: 1 thread.\n");
@@ -401,40 +431,55 @@ void summary(void) {
 #endif
     printf("Kernel size:                %dx%d\n", MR, NR);
     printf("%s\n", HLINE);
-    printf("Elements of array A: %d\n", M*K); 
-    printf("Elements of array B: %d\n", K*N); 
-    printf("Elements of array C: %d\n", M*N); 
+    printf("Elements of array A: %d (padded: %d)\n", M_RAW*K, M*K);
+    printf("Elements of array B: %d (padded: %d)\n", K*N_RAW, K*N);
+    printf("Elements of array C: %d (padded: %d)\n", M_RAW*N_RAW, M*N);
     printf("%s\n", HLINE);
-    memory_per_array("A", M, K);  
-    memory_per_array("B", K, N);  
-    memory_per_array("C", M, N);  
+    printf("Matrix dims (raw):  M=%d N=%d K=%d\n", M_RAW, N_RAW, K);
+    printf("Matrix dims (pad):  M=%d N=%d K=%d\n", M, N, K);
+    memory_per_array("A (padded)", M, K);
+    memory_per_array("B (padded)", K, N);
+    memory_per_array("C (padded)", M, N);
     printf("%s\n", HLINE);
 }
 
 int main(void) {
-    assert(M%MR==0 && N%NR==0);
 #ifndef __AVX2__
     fprintf(stderr, "AVX2 not supported.");
     exit(EXIT_FAILURE);
 #endif
-    /* the pointer returned from malloc is suitably alligned
-     * https://pubs.opengroup.org/onlinepubs/7908799/xsh/malloc.html */
-    ARR_TYPE *A = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M*K);
-    ARR_TYPE *B = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * K*N);
-    ARR_TYPE *C = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M*N);
-    if (!A || !B || !C) exit(EXIT_FAILURE);
-    if (is_aligned(A, L1_DCACHE_LINESIZE)) printf("A aligned.\n");
-    if (is_aligned(B, L1_DCACHE_LINESIZE)) printf("B aligned.\n");
-    if (is_aligned(C, L1_DCACHE_LINESIZE)) printf("C aligned.\n");
+    /* Allocate raw-sized arrays and fill. */
+    ARR_TYPE *A_raw = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M_RAW*K);
+    ARR_TYPE *B_raw = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * K*N_RAW);
+    ARR_TYPE *C_raw = (ARR_TYPE*)aligned_alloc(L1_DCACHE_LINESIZE, sizeof(ARR_TYPE) * M_RAW*N_RAW);
+    if (!A_raw || !B_raw || !C_raw) exit(EXIT_FAILURE);
+    if (is_aligned(A_raw, L1_DCACHE_LINESIZE)) printf("A aligned.\n");
+    if (is_aligned(B_raw, L1_DCACHE_LINESIZE)) printf("B aligned.\n");
+    if (is_aligned(C_raw, L1_DCACHE_LINESIZE)) printf("C aligned.\n");
+
+    fill(M_RAW, K, A_raw);
+    fill(K, N_RAW, B_raw);
+
+    /* Pad rows of A (MR-aligned) and columns of B (NR-aligned). */
+    size_t M_pad, N_pad;
+    ARR_TYPE *A_pad = pad_rows(A_raw, M_RAW, K, MR, &M_pad);
+    ARR_TYPE *B_pad = pad_cols(B_raw, K, N_RAW, NR, &N_pad);
+    ARR_TYPE *C_pad = NULL;
+
+    ARR_TYPE *A = A_pad ? A_pad : A_raw;
+    ARR_TYPE *B = B_pad ? B_pad : B_raw;
+    if (A_pad || B_pad) {
+        size_t M_c = A_pad ? M_pad : M_RAW;
+        size_t N_c = B_pad ? N_pad : N_RAW;
+        C_pad = (ARR_TYPE*)calloc(M_c * N_c, sizeof(ARR_TYPE));
+        if (!C_pad) exit(EXIT_FAILURE);
+    }
+    ARR_TYPE *C = C_pad ? C_pad : C_raw;
 
     /* Summary: array sizes, number of elements, etc. */
     summary();
 
-    /* Array fill. */
-    fill(M, K, A);
-    fill(K, N, B);
-
-#ifdef MULTI_THREAD
+#ifdef _OPENMP
     #pragma omp parallel num_threads(NTHREADS)
 #endif
     /* Cache warmup */
@@ -454,7 +499,7 @@ int main(void) {
 
     /* Evaluation metrics */
     const int precision = 2;
-    double flops = 2.0*M*N*K;
+    double flops = 2.0*M_RAW*N_RAW*K;
     double gflops = 0.0;
 
     /* matmul NITER times. */
@@ -481,6 +526,7 @@ int main(void) {
     /* Otherwise clang with -O3 will assume that C is "dead" and delete all the FMA istructions */
     volatile ARR_TYPE sink = C[0];
     (void)sink;
-    free(A); free(B); free(C);
+    free(A_raw); free(B_raw); free(C_raw);
+    free(A_pad); free(B_pad); free(C_pad);
     exit(EXIT_SUCCESS);
 }
