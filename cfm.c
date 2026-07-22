@@ -51,8 +51,8 @@
         putchar('\n');                                          \
     } while(0)
 
-static void cfm_die(const char *msg) {
-    fprintf(stderr, "cf-m: %s\n", msg);
+static void cfm_die(const int line, const char *msg) {
+    fprintf(stderr, "\033[33m[cf-m]\033[0m %s:%d: %s\n", __FILE__, line, msg);
     exit(EXIT_FAILURE);
 }
 
@@ -60,7 +60,7 @@ cfm_string *cfm_string_new(const char *content) {
     size_t l = strlen(content);
     CFM_ASSERT(l > 0);
     cfm_string *s = (cfm_string*)malloc(sizeof(cfm_string));
-    if (!s) cfm_die("Out of memory");
+    if (!s) cfm_die(__LINE__, "Out of memory");
     s->content = content;
     s->len = l;
     return s;
@@ -102,7 +102,7 @@ static void cfm_set_tensor_strides(cfm_tensor *t) {
 CFMDEF cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
         uint8_t ndims, const uint16_t *shape) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
-    if (!t) cfm_die("Out of memory"); 
+    if (!t) cfm_die(__LINE__, "Out of memory"); 
     t->name = cfm_string_new(name);
     t->dtype = dtype;
     t->ndims = ndims;
@@ -111,14 +111,14 @@ CFMDEF cfm_tensor *cfm_tensor_new(const char *name, cfm_dtype dtype,
     for (size_t i = 0; i < t->ndims; ++i) t->numel *= t->shape[i]; 
     cfm_set_tensor_strides(t);
     if (!(t->data = calloc(t->numel, cfm_element_size(t->dtype))))
-        cfm_die("Out of memory");
+        cfm_die(__LINE__, "Out of memory");
     return t;
 }
 
 cfm_tensor *cfm_tensor_from(const char *name, cfm_dtype dtype,
         uint8_t ndims, const uint16_t *shape, void *data) {
     cfm_tensor *t = (cfm_tensor*)malloc(sizeof(cfm_tensor));
-    if (!t) cfm_die("Out of memory");
+    if (!t) cfm_die(__LINE__, "Out of memory");
     t->name = cfm_string_new(name);
     t->dtype = dtype;
     t->ndims = ndims;
@@ -275,17 +275,17 @@ CFMDEF uint64_t cfm_tensor_ravel_index(const uint16_t *coords, const uint64_t *s
 
 cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors, 
         int ntensors, uint8_t cat_dim) {
-    if (ntensors <= 1) cfm_die("cfm_tensor_cat not enough tensors to cat.");
+    if (ntensors <= 1) cfm_die(__LINE__, "cfm_tensor_cat not enough tensors to cat.");
 
     /* Promote a CFM_FLOAT32 to CFM_FLOAT64 will only add a bunch of useless zeros. */
     int i = ntensors;
     while (--i>0 && tensors[i]->dtype == tensors[0]->dtype);
-    if (i != 0) cfm_die("cfm_tensor_cat cannot cat tensors with different cfm_dtype.");
+    if (i != 0) cfm_die(__LINE__, "cfm_tensor_cat cannot cat tensors with different cfm_dtype.");
 
     /* Tensors must have same number of dimensions. */
     i = ntensors;
     while (--i>0 && tensors[i]->ndims == tensors[0]->ndims);
-    if (i != 0) cfm_die("cfm_tensor_cat cannot cat tensors with different ndims.");
+    if (i != 0) cfm_die(__LINE__, "cfm_tensor_cat cannot cat tensors with different ndims.");
 
     /* Tensor must have the same shape (except in the concatening dimension cat_dim). */
     uint8_t dms = tensors[0]->ndims;
@@ -293,7 +293,7 @@ cfm_tensor *cfm_tensor_cat(const char *name, const cfm_tensor **tensors,
         for (uint8_t d = 0; d < dms; ++d) {
             if (d == cat_dim) continue;
             if (tensors[0]->shape[d] != tensors[t]->shape[d])
-                cfm_die("cfm_tensor_cat shape mismatch.");
+                cfm_die(__LINE__, "cfm_tensor_cat shape mismatch.");
         }
     }
 
@@ -367,7 +367,7 @@ cfm_tensor *cfm_tensor_expand(const cfm_tensor *u, const uint8_t exp_ndims,
         /* Treat the missing dimension as 1 in order to pass the second if. */
         uint16_t us = (du >= 0) ? u->shape[du] : 1;
         if (us != 1 && us != exp_shape[d])
-            cfm_die("cfm_tensor_expand cannot expand non-singleton dimension.");
+            cfm_die(__LINE__, "cfm_tensor_expand cannot expand non-singleton dimension.");
         du--;
     }
     cfm_tensor *t = cfm_tensor_new(u->name->content, u->dtype, exp_ndims, exp_shape);
@@ -410,7 +410,7 @@ cfm_tensor *cfm_tensor_get_last(const cfm_tensor *t) {
     uint16_t shape[t->ndims-1];
     for (uint8_t i = 0; i < t->ndims-1; ++i) shape[i] = t->shape[i+1];
     cfm_tensor *tt = cfm_tensor_new(t->name->content, t->dtype, t->ndims-1, shape);
-    if (!tt) cfm_die("Out of memory");
+    if (!tt) cfm_die(__LINE__, "Out of memory");
     uint64_t offset = (t->shape[0]-1) * t->strides[0];
     switch (tt->dtype) {
         case CFM_FLOAT32:
@@ -540,11 +540,11 @@ static bool cfm_tensor_broadcast(const cfm_tensor *u, const cfm_tensor *v,
 }
 
 cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tensor *v) {
-    if (u->dtype != v->dtype) cfm_die("cfm_tensor_add cannot add tensors with differents dtype.");
+    if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_add cannot add tensors with differents dtype.");
     uint8_t ndims;
     uint16_t shape[CFM_MAX_DIMS] = {0};
     if (!cfm_tensor_broadcast(u, v, &ndims, shape))
-        cfm_die("cfm_tensor_add the two tensors are not broadcastable.");
+        cfm_die(__LINE__, "cfm_tensor_add the two tensors are not broadcastable.");
     cfm_tensor *t = cfm_tensor_new(name, u->dtype, ndims, shape);
     cfm_tensor *u_exp = cfm_tensor_expand(u, ndims, shape); 
     cfm_tensor *v_exp = cfm_tensor_expand(v, ndims, shape); 
@@ -569,11 +569,11 @@ cfm_tensor *cfm_tensor_add(const char *name, const cfm_tensor *u, const cfm_tens
 }
 
 cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u, const cfm_tensor *v) {
-    if (u->dtype != v->dtype) cfm_die("cfm_tensor_mul cannot mul tensors with differents dtype.");
+    if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_mul cannot mul tensors with differents dtype.");
     uint8_t ndims;
     uint16_t shape[CFM_MAX_DIMS] = {0};
     if (!cfm_tensor_broadcast(u, v, &ndims, shape))
-        cfm_die("cfm_tensor_mul the two tensors are not broadcastable.");
+        cfm_die(__LINE__, "cfm_tensor_mul the two tensors are not broadcastable.");
     cfm_tensor *t = cfm_tensor_new(name, u->dtype, ndims, shape);
     cfm_tensor *u_exp = cfm_tensor_expand(u, ndims, shape); 
     cfm_tensor *v_exp = cfm_tensor_expand(v, ndims, shape); 
@@ -595,6 +595,37 @@ cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u, const cfm_tens
     cfm_tensor_free(u_exp);
     cfm_tensor_free(v_exp);
     return t;
+}
+
+cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v) {
+    /* The check on the dtype may seems redundant if the caller of the function is cfm_tensor_matmul but is
+     * needed if the caller is NOT cfm_tensor_matmul. */
+    if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_dot cannot compute the dot product between tensors with differents dtype.");
+    if (u->ndims != 1 || v->ndims != 1) cfm_die(__LINE__, "cfm_tensor_dot both cfm_tensor needs to be 1D to compute the dot product.");
+    if (u->numel != v->numel) cfm_die(__LINE__, "cfm_tensor_dot cannot compute the dot product between tensors with differents numel.");
+
+    cfm_tensor *t = cfm_tensor_new(name, u->dtype, 1, (uint16_t[]){1});
+    switch (t->dtype) {
+        case CFM_FLOAT32:
+            float *f_t_data = t->data;
+            float *f_u_data = u->data;
+            float *f_v_data = v->data;
+            for (size_t i = 0; i < u->numel; ++i) f_t_data[0] += f_u_data[i] * f_v_data[i];
+            break;
+        case CFM_FLOAT64:
+            double *d_t_data = t->data;
+            double *d_u_data = u->data;
+            double *d_v_data = v->data;
+            for (size_t i = 0; i < u->numel; ++i) d_t_data[0] += d_u_data[i] * d_v_data[i];
+            break;
+    }
+    return t;
+}
+
+cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v) {
+    if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_matmul cannot matmul tensors with differents dtype.");
 }
 
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
