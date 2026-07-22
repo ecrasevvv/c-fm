@@ -629,21 +629,19 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
 
 /* Row-major indexing */
 #define IDX(row, cols, col) (((row)*cols)+(col))
-#ifdef __AVX2__
 
+#ifdef __AVX2__
 /* This is a fast matmul implementation done with AVX2 instructions that 
  * achieves the same performance as numpy in terms of GFLOPS (see ./mm/mm.c for more details).
  * Note that this is optimized for my CPU since the project is meant to be an educational project for me,
  * this means that the results and behavior on other CPUs are unknown to me.
  * Feel free to read ./mm/mm.c to explore in details the fast matmul implementation, try other micro-kernels
  * and run the benchmark on your CPU. */
-
 #define kernel_16x6(A_start, B_start, C_start)          \
     _Generic((A_start),                                 \
             float:  kernel_16x6f,                       \
             double: kernel_16x6d,                       \
             )(A_start, B_start, C_start)
-
 #if 0 // necessary until porting is finished
 __attribute__((noinline))
 static void kernel_16x6f(float *A_start, float *B_start, float *__restrict__ C_start) {
@@ -747,9 +745,11 @@ static void mm_base_f(float *__restrict__ C, uint16_t m, uint16_t n,
     }
 }
 
-static void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
+/* re-add static, -Wunused-function suppression */
+void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
         const double *A, uint16_t k,
         const double *B) {
+    (void)C; (void)m; (void)n; (void)A; (void)k; (void)B;
     cfm_die(__LINE__, "mm_base_d not implemented.");
 }
 #endif /* __AVX2__ */
@@ -770,13 +770,19 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         uint16_t k = v->shape[0];
         uint16_t t_shape[2] = {m, n};
         cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
+#ifdef __AVX2__
+        cfm_tensor_free(t);
+        cfm_die(__LINE__, "cfm_tensor_matmul AVX2 matmul not supported yet.");
+        // mm()
+#else
         mm_base_f((float*)t->data, m, n, (float*)u->data, k, (float*)v->data);
+#endif /* __AVX2__ */
         return t;
     }
 
     /* Other cases */
-
-    cfm_die(__LINE__, "cfm_tensor_matmul on the provided u and v not supported yet");
+    fprintf(stderr, "cfm_tensor_matmul on the provided u and v not supported yet.");
+    return NULL;
 }
 
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
