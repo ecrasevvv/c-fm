@@ -627,8 +627,8 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
     return t;
 }
 
-// TODO: make this code functional fro cfm_tensor_matmul
 #ifdef __AVX2__
+
 /* This is a fast matmul implementation done with AVX2 instructions that 
  * achieves the same performance as numpy in terms of GFLOPS (see ./mm/mm.c for more details).
  * Note that this is optimized for my CPU since the project is meant to be an educational project for me,
@@ -636,9 +636,15 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
  * Feel free to read ./mm/mm.c to explore in details the fast matmul implementation, try other micro-kernels
  * and run the benchmark on your CPU. */
 
+#define kernel_16x6(A_start, B_start, C_start)          \
+    _Generic((A_start),                                 \
+            float:  kernel_16x6f,                       \
+            double: kernel_16x6d,                       \
+            )(A_start, B_start, C_start)
+
 #if 0 // necessary until porting is finished
 __attribute__((noinline))
-static void kernel_16x6(cfm_dtype *A_start, cfm_dtype *B_start, cfm_dtype *__restrict__ C_start) {
+static void kernel_16x6f(float *A_start, float *B_start, float *__restrict__ C_start) {
     __m256 acc[6][2] = {};
     __m256 b_broadcast;
     __m256 a0;
@@ -679,39 +685,75 @@ static void kernel_16x6(cfm_dtype *A_start, cfm_dtype *B_start, cfm_dtype *__res
     }
 }
 
-static void mm(cfm_dtype *A, cfm_dtype *B, cfm_dtype *__restrict__ C) {
+/* Since one double is 8bytes a single YMM can store 4 doubles. The logic of the micro-kernel
+ * will be completely different.
+ * Not planned as todo for now. */
+__attribute__((noinline))
+static void kernel_16x6d(double *A_start, double *B_start, double *__restrict__ C_start) {
+    cfm_die(__LINE__, "kernel_16x6d not implemented.");
+}
+
+#define mm(A, B, C)         \
+    _Generic((A),           \
+            float:  mm_f,   \
+            double: mm_d,   \
+            )(A, B, C)
+
+static void mm_f(float *A, float *B, float *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
 #ifdef _OPENMP
 #define NTHREADS 12
     #pragma omp parallel for collapse(2) num_threads(NTHREADS)
-#endif
+#endif  /* _OPENMP */
     for (size_t i = 0; i < M; i+=MR) {
         for (size_t j = 0; j < N; j+=NR) {
             kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
         }
     }
 }
+
+static void mm_d(double *A, double *B, double *__restrict__ C) {
+    cfm_die(__LINE__, "mm_d not implemented.");
+}
+
 #endif // if 0
-#else
+#else /* no __AVX2__ */
 #if 0 // necessary until porting is finished
 /* If your CPU does not support AVX2 instructions then the multiplication 
  * between the two matrices will happen in the classic way.
  * Note: this can be optimized. */
-static void baseline(const cfm_dtype *A, const cfm_dtype *B, cfm_dtype *__restrict__ C) {
+
+#define mm_base(A, B, C)        \
+    _Generic((A),               \
+            float: mm_base_f,   \
+            double: mm_base_d,  \
+            )(A, B, C)
+
+static void mm_base_f(const float *A, const float *B, float *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
-    //for (size_t i = 0; i < M; ++i) {
-    //    for (size_t j = 0; j < N; ++j) {
-    //        for (size_t p = 0; p < K; ++p) {
-    //            C[idx(j,M,i)] += A[idx(p,M,i)] * B[idx(j,K,p)];
-    //        }
-    //    }
-    //}
+#ifdef _OPENMP
+#define NTHREADS 12
+    #pragma omp parallel for collapse(2) num_threads(NTHREADS)
+#endif  /* _OPENMP */
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t j = 0; j < N; ++j) {
+            for (size_t p = 0; p < K; ++p) {
+                C[idx(j,M,i)] += A[idx(p,M,i)] * B[idx(j,K,p)];
+            }
+        }
+    }
+}
+
+static void mm_base_d(const double *A, const double *B, double *__restrict__ C) {
+    cfm_die(__LINE__, "mm_base_d not implemented.");
 }
 #endif // if 0
-#endif
+#endif /* __AVX2__ */
 
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
+    if (u->dtype == CFM_FLOAT64 || v->dtype == CFM_FLOAT64) 
+        cfm_die(__LINE__, "cfm_tensor_matmul can only perform matmul on CFM_FLOAT32 cfm_tensor for now.");
     if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_matmul cannot matmul tensors with differents dtype.");
 
     /* Both 1D cfm_tensor, dot product. */
