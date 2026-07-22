@@ -600,7 +600,7 @@ cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u, const cfm_tens
 cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
     /* The check on the dtype may seems redundant if the caller of the function is cfm_tensor_matmul but is
-     * needed if the caller is NOT cfm_tensor_matmul. */
+     * needed if the caller is NOT cfm_tensor_matmul. The same goes for the check on the ndims. */
     if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_dot cannot compute the dot product between tensors with differents dtype.");
     if (u->ndims != 1 || v->ndims != 1) cfm_die(__LINE__, "cfm_tensor_dot both cfm_tensor needs to be 1D to compute the dot product.");
     if (u->numel != v->numel) cfm_die(__LINE__, "cfm_tensor_dot cannot compute the dot product between tensors with differents numel.");
@@ -626,6 +626,15 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
     if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_matmul cannot matmul tensors with differents dtype.");
+
+    /* Both 1D cfm_tensor, dot product. */
+    if (u->ndims == 1 && v->ndims == 1) return cfm_tensor_dot(name, u, v);
+
+    /* Both 2D cfm_tensor, matrix-matrix product. Note: efficient matmul implemented in mm/mm.c */
+
+    /* Other cases */
+
+    else cfm_die(__LINE__, "cfm_tensor_matmul on the provided u and v not supported yet");
 }
 
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
