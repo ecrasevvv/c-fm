@@ -627,6 +627,8 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
     return t;
 }
 
+/* Row-major indexing */
+#define IDX(row, cols, col) (((row)*cols)+(col))
 #ifdef __AVX2__
 
 /* This is a fast matmul implementation done with AVX2 instructions that 
@@ -718,52 +720,63 @@ static void mm_d(double *A, double *B, double *__restrict__ C) {
 
 #endif // if 0
 #else /* no __AVX2__ */
-#if 0 // necessary until porting is finished
 /* If your CPU does not support AVX2 instructions then the multiplication 
  * between the two matrices will happen in the classic way.
  * Note: this can be optimized. */
-
 #define mm_base(A, B, C)        \
     _Generic((A),               \
             float: mm_base_f,   \
             double: mm_base_d,  \
             )(A, B, C)
 
-static void mm_base_f(const float *A, const float *B, float *__restrict__ C) {
+static void mm_base_f(float *__restrict__ C, uint16_t m, uint16_t n,
+        const float *A, uint16_t k,
+        const float *B) {
     // A[M][K], B[K][N], C[M][N]
+    // u[M][K], v[K][N], C[M][N]
 #ifdef _OPENMP
 #define NTHREADS 12
     #pragma omp parallel for collapse(2) num_threads(NTHREADS)
 #endif  /* _OPENMP */
-    for (size_t i = 0; i < M; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            for (size_t p = 0; p < K; ++p) {
-                C[idx(j,M,i)] += A[idx(p,M,i)] * B[idx(j,K,p)];
+    for (uint16_t i = 0; i < m; ++i) {
+        for (uint16_t j = 0; j < n; ++j) {
+            for (uint16_t p = 0; p < k; ++p) {
+                C[IDX(i,n,j)] += A[IDX(i,k,p)] * B[IDX(p,n,j)];
             }
         }
     }
 }
 
-static void mm_base_d(const double *A, const double *B, double *__restrict__ C) {
+static void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
+        const double *A, uint16_t k,
+        const double *B) {
     cfm_die(__LINE__, "mm_base_d not implemented.");
 }
-#endif // if 0
 #endif /* __AVX2__ */
 
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
     if (u->dtype == CFM_FLOAT64 || v->dtype == CFM_FLOAT64) 
         cfm_die(__LINE__, "cfm_tensor_matmul can only perform matmul on CFM_FLOAT32 cfm_tensor for now.");
-    if (u->dtype != v->dtype) cfm_die(__LINE__, "cfm_tensor_matmul cannot matmul tensors with differents dtype.");
 
     /* Both 1D cfm_tensor, dot product. */
     if (u->ndims == 1 && v->ndims == 1) return cfm_tensor_dot(name, u, v);
 
     /* Both 2D cfm_tensor, matrix-matrix product. Note: efficient matmul implemented in mm/mm.c */
+    if (u->ndims == 2 && v->ndims == 2) {
+        if (u->shape[1] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
+        uint16_t m = u->shape[0];
+        uint16_t n = v->shape[1];
+        uint16_t k = v->shape[0];
+        uint16_t t_shape[2] = {m, n};
+        cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
+        mm_base_f((float*)t->data, m, n, (float*)u->data, k, (float*)v->data);
+        return t;
+    }
 
     /* Other cases */
 
-    else cfm_die(__LINE__, "cfm_tensor_matmul on the provided u and v not supported yet");
+    cfm_die(__LINE__, "cfm_tensor_matmul on the provided u and v not supported yet");
 }
 
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u) {
