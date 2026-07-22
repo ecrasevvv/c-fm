@@ -118,7 +118,21 @@ cfm_tensor *cfm_tensor_mul(const char *name, const cfm_tensor *u,
  * elements of the input tensor u. */
 cfm_tensor *cfm_tensor_exp(const char *name, const cfm_tensor *u);
 
-//matmul
+/* This function returns a new cfm_tensor as a result of the dot product
+ * between u and v. The dot product between two cfm_tensor with differents 
+ * numel is NOT supported (for now). */
+cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v);
+
+/* This function returns a new cfm_tensor as a result of the matrix 
+ * product between u and v. The behavior depends on the dimensionality
+ * of the tensors as follows:
+ *  - if both cfm_tensors are 1-dimensional, the dot product (scalar) is returned
+ *  - if both cfm_tensors are 2-dimensional, the matrix product is returned
+ *  
+ *  - todo: other cases https://docs.pytorch.org/docs/2.13/generated/torch.matmul.html */
+cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
+        const cfm_tensor *v);
 
 /* This function prints out the cfm_tensor t in the pytorch style. */
 void cfm_tensor_print(const cfm_tensor *t, int precision);
