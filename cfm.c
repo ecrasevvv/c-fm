@@ -7,6 +7,10 @@
 #include <math.h>
 #include "cfm.h"
 
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 #ifndef CFM_FREE
 #define CFM_FREE free
 #endif  /* CFM_FREE */
@@ -622,6 +626,89 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
     }
     return t;
 }
+
+// TODO: make this code functional fro cfm_tensor_matmul
+#ifdef __AVX2__
+/* This is a fast matmul implementation done with AVX2 instructions that 
+ * achieves the same performance as numpy in terms of GFLOPS (see ./mm/mm.c for more details).
+ * Note that this is optimized for my CPU since the project is meant to be an educational project for me,
+ * this means that the results and behavior on other CPUs are unknown to me.
+ * Feel free to read ./mm/mm.c to explore in details the fast matmul implementation, try other micro-kernels
+ * and run the benchmark on your CPU. */
+
+#if 0 // necessary until porting is finished
+__attribute__((noinline))
+static void kernel_16x6(cfm_dtype *A_start, cfm_dtype *B_start, cfm_dtype *__restrict__ C_start) {
+    __m256 acc[6][2] = {};
+    __m256 b_broadcast;
+    __m256 a0;
+    __m256 a1;
+
+    for (size_t p = 0; p < K; ++p) {
+        a0 = _mm256_loadu_ps(&A_start[p * M    ]);
+        a1 = _mm256_loadu_ps(&A_start[idx(p,M,8)]);
+    
+        b_broadcast = _mm256_broadcast_ss(&B_start[p]);
+        acc[0][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0][0]);
+        acc[0][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[0][1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(1,K,p)]);
+        acc[1][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[1][0]);
+        acc[1][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[1][1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(2,K,p)]);
+        acc[2][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[2][0]);
+        acc[2][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[2][1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(3,K,p)]);
+        acc[3][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[3][0]);
+        acc[3][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[3][1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(4,K,p)]);
+        acc[4][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[4][0]);
+        acc[4][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[4][1]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_start[idx(5,K,p)]);
+        acc[5][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[5][0]);
+        acc[5][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[5][1]);
+    }
+
+    for (size_t j = 0; j < 6; ++j) {
+        _mm256_storeu_ps(&C_start[j * M], acc[j][0]);
+        _mm256_storeu_ps(&C_start[idx(j,M,8)], acc[j][1]);
+    }
+}
+
+static void mm(cfm_dtype *A, cfm_dtype *B, cfm_dtype *__restrict__ C) {
+    // A[M][K], B[K][N], C[M][N]
+#ifdef _OPENMP
+#define NTHREADS 12
+    #pragma omp parallel for collapse(2) num_threads(NTHREADS)
+#endif
+    for (size_t i = 0; i < M; i+=MR) {
+        for (size_t j = 0; j < N; j+=NR) {
+            kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
+        }
+    }
+}
+#endif // if 0
+#else
+#if 0 // necessary until porting is finished
+/* If your CPU does not support AVX2 instructions then the multiplication 
+ * between the two matrices will happen in the classic way.
+ * Note: this can be optimized. */
+static void baseline(const cfm_dtype *A, const cfm_dtype *B, cfm_dtype *__restrict__ C) {
+    // A[M][K], B[K][N], C[M][N]
+    //for (size_t i = 0; i < M; ++i) {
+    //    for (size_t j = 0; j < N; ++j) {
+    //        for (size_t p = 0; p < K; ++p) {
+    //            C[idx(j,M,i)] += A[idx(p,M,i)] * B[idx(j,K,p)];
+    //        }
+    //    }
+    //}
+}
+#endif // if 0
+#endif
 
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
