@@ -13,7 +13,7 @@ BENCH_O=-O3
 DEBUG_O=-O0
 
 BENCH_CFLAGS=$(BENCH_O) -ffast-math $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c99
-DEBUG_CFLAGS=$(DEBUG_O) -DDEBUG -Wall -Wextra -std=c99
+DEBUG_CFLAGS=$(DEBUG_O) -DDEBUG -Wall -Wextra -std=c99 -g
 
 LDLIBS=-lm
 
