@@ -57,10 +57,10 @@ void cfm_tensor_free(cfm_tensor *t);
 
 /* This function returns a new one-dimensional cfm_tensor of size end/step_size whose
  * values are evenly spaced from start to end. */
-#define cfm_tensor_linspace(name, dtype, start, end, step_size)  \
-    _Generic((start),                                                           \
-            float:  cfm_tensor_linspace_float32,                                \
-            double: cfm_tensor_linspace_float64                                 \
+#define cfm_tensor_linspace(name, dtype, start, end, step_size) \
+    _Generic((start),                                           \
+            float:  cfm_tensor_linspace_float32,                \
+            double: cfm_tensor_linspace_float64                 \
             )(name, dtype, start, end, step_size) 
 cfm_tensor *cfm_tensor_linspace_float32(const char *name, cfm_dtype dtype,
         float start, float end, float step_size);
@@ -68,10 +68,10 @@ cfm_tensor *cfm_tensor_linspace_float64(const char *name, cfm_dtype dtype,
         double start, double end, double step_size);
 
 /* This function returns a new cfm_tensor filled with fill_value. */
-#define cfm_tensor_full(name, dtype, ndims, shape, fill_value)   \
-    _Generic((fill_value),                                                      \
-            float:  cfm_tensor_full_float32,                                    \
-            double: cfm_tensor_full_float64                                     \
+#define cfm_tensor_full(name, dtype, ndims, shape, fill_value)  \
+    _Generic((fill_value),                                      \
+            float:  cfm_tensor_full_float32,                    \
+            double: cfm_tensor_full_float64                     \
             )(name, dtype, ndims, shape, fill_value)
 cfm_tensor *cfm_tensor_full_float32(const char *name, cfm_dtype dtype,
         uint8_t ndims, const uint16_t *shape, float fill_value);
@@ -128,7 +128,12 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
  * product between u and v. The behavior depends on the dimensionality
  * of the tensors as follows:
  *  - if both cfm_tensors are 1-dimensional, the dot product (scalar) is returned
- *  - if both cfm_tensors are 2-dimensional, the matrix product is returned
+ *  - if both cfm_tensors are 2-dimensional, the matrix-matrix product is returned
+ *  - If the first argument is 1-dimensional and the second argument is 2-dimensional, 
+ *      a 1 is prepended to its dimension for the purpose of the matrix multiply. 
+ *      After the matrix multiply, the prepended dimension is removed.
+ *  - If the first argument is 2-dimensional and the second argument is 1-dimensional, 
+ *      the matrix-vector product is returned.
  *  
  *  - todo: other cases https://docs.pytorch.org/docs/2.13/generated/torch.matmul.html 
  *
