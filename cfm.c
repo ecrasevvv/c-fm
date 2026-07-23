@@ -12,8 +12,17 @@
 #endif /* __AVX2__ */
 
 #ifdef _OPENMP
-#define CFM_NTHREADS 12
+#include <omp.h>
 #endif /* _OPENMP */
+
+static int cfm_num_threads = 1;
+void cfm_set_num_threads(int n) {
+    cfm_num_threads = n;
+}
+
+int cfm_get_num_threads(void) {
+    return cfm_num_threads;
+}
 
 #ifndef CFM_FREE
 #define CFM_FREE free
@@ -641,102 +650,117 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
  * this means that the results and behavior on other CPUs are unknown to me.
  * Feel free to read ./mm/mm.c to explore in details the fast matmul implementation, try other micro-kernels
  * and run the benchmark on your CPU. */
-#define kernel_16x6(A_start, B_start, C_start)          \
-    _Generic((A_start),                                 \
-            float:  kernel_16x6f,                       \
-            double: kernel_16x6d,                       \
-            )(A_start, B_start, C_start)
-#if 0 // necessary until porting is finished
+
+/* Row-major matrix multiply using AVX2: transposes A and B to column-major, runs the 16x6 kernel, 
+ * then transposes C back to row-major.
+ *
+ * To make thing works with the studyied and implemented fast matmul in ./mm/mm.c  the matrices needs to be
+ * transposed since cfm_tensor->data is row-major but the fast matmul micro-kernel(s) uses col-major indexing. 
+ * Im too lazy to re-write a kernel for the row-major order cfm_tensor->data matrices so we just pay the 
+ * overhead that is okay for small matrices used in a simple 2D Flow Matching project like mine. */
+#define CFM_MR 16
+#define CFM_NR 6
+/* 16x6 AVX2 micro-kernel. Computes a 16x6 tile of C_col (col-major) from
+ * column-major A_col and B_col slices. Identical FMA logic to mm/mm.c. */
 __attribute__((noinline))
-static void kernel_16x6f(float *A_start, float *B_start, float *__restrict__ C_start) {
+static void kernel_16x6f(float *__restrict__ C_col, const uint16_t mp,
+        const float *A_col, const uint16_t k,
+        const float *B_col) {
     __m256 acc[6][2] = {};
     __m256 b_broadcast;
     __m256 a0;
     __m256 a1;
 
-    for (size_t p = 0; p < K; ++p) {
-        a0 = _mm256_loadu_ps(&A_start[p * M    ]);
-        a1 = _mm256_loadu_ps(&A_start[idx(p,M,8)]);
-    
-        b_broadcast = _mm256_broadcast_ss(&B_start[p]);
+    for (size_t p = 0; p < k; ++p) {
+        a0 = _mm256_loadu_ps(&A_col[p * mp]);
+        a1 = _mm256_loadu_ps(&A_col[p * mp + 8]);
+
+        b_broadcast = _mm256_broadcast_ss(&B_col[p]);
         acc[0][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0][0]);
         acc[0][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[0][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_start[idx(1,K,p)]);
+        b_broadcast = _mm256_broadcast_ss(&B_col[1 * k + p]);
         acc[1][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[1][0]);
         acc[1][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[1][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_start[idx(2,K,p)]);
+        b_broadcast = _mm256_broadcast_ss(&B_col[2 * k + p]);
         acc[2][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[2][0]);
         acc[2][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[2][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_start[idx(3,K,p)]);
+        b_broadcast = _mm256_broadcast_ss(&B_col[3 * k + p]);
         acc[3][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[3][0]);
         acc[3][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[3][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_start[idx(4,K,p)]);
+        b_broadcast = _mm256_broadcast_ss(&B_col[4 * k + p]);
         acc[4][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[4][0]);
         acc[4][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[4][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_start[idx(5,K,p)]);
+        b_broadcast = _mm256_broadcast_ss(&B_col[5 * k + p]);
         acc[5][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[5][0]);
         acc[5][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[5][1]);
     }
 
     for (size_t j = 0; j < 6; ++j) {
-        _mm256_storeu_ps(&C_start[j * M], acc[j][0]);
-        _mm256_storeu_ps(&C_start[idx(j,M,8)], acc[j][1]);
+        _mm256_storeu_ps(&C_col[j * mp    ], acc[j][0]);
+        _mm256_storeu_ps(&C_col[j * mp + 8], acc[j][1]);
     }
 }
 
-/* Since one double is 8bytes a single YMM can store 4 doubles. The logic of the micro-kernel
- * will be completely different.
- * Not planned as todo for now. */
-__attribute__((noinline))
-static void kernel_16x6d(double *A_start, double *B_start, double *__restrict__ C_start) {
-    cfm_die(__LINE__, "kernel_16x6d not implemented.");
+CFMDEF void cfm_matrix_transpose(float *dst, uint16_t p_cols,
+        const float *src, uint16_t rows, uint16_t cols, uint16_t ld) {
+    for (uint16_t r = 0; r < rows; r++)
+        for (uint16_t c = 0; c < cols; c++)
+            dst[c * p_cols + r] = src[r * ld + c];
 }
 
-#define mm(A, B, C)         \
-    _Generic((A),           \
-            float:  mm_f,   \
-            double: mm_d,   \
-            )(A, B, C)
+static void mm_f(float *__restrict__ C, const uint16_t m, const uint16_t n,
+        const float *A, const uint16_t k,
+        const float *B) {
+    uint16_t mp = (m % CFM_MR) ? m + CFM_MR - (m % CFM_MR) : m;
+    uint16_t np = (n % CFM_NR) ? n + CFM_NR - (n % CFM_NR) : n;
 
-static void mm_f(float *A, float *B, float *__restrict__ C) {
-    // A[M][K], B[K][N], C[M][N]
+    float *AT = calloc(k * mp, sizeof(float));
+    if (!AT) cfm_die(__LINE__, "Out of memory");
+    cfm_matrix_transpose(AT, mp, A, m, k, k);
+
+    float *BT = calloc(np * k, sizeof(float));
+    if (!BT) cfm_die(__LINE__, "Out of memory");
+    cfm_matrix_transpose(BT, k, B, k, n, n);
+
+    float *CT = calloc(np * mp, sizeof(float));
+    if (!CT) cfm_die(__LINE__, "Out of memory");
+
 #ifdef _OPENMP
-    #pragma omp parallel for collapse(2) num_threads(CFM_NTHREADS)
-#endif  /* _OPENMP */
-    for (size_t i = 0; i < M; i+=MR) {
-        for (size_t j = 0; j < N; j+=NR) {
-            kernel_16x6(&A[i], &B[j*K], &C[idx(j,M,i)]);
+    #pragma omp parallel for collapse(2) num_threads(cfm_num_threads)
+#endif
+    for (size_t i = 0; i < mp; i += CFM_MR) {
+        for (size_t j = 0; j < np; j += CFM_NR) {
+            kernel_16x6f(&CT[j * mp + i], mp, &AT[i], k, &BT[j * k]);
         }
     }
+    cfm_matrix_transpose(C, n, CT, n, m, mp);
+
+    free(AT); free(BT); free(CT);
 }
 
-static void mm_d(double *A, double *B, double *__restrict__ C) {
+/* re-add static, -Wunused-function suppression */
+void mm_d(double *__restrict__ C, const uint16_t m, const uint16_t n,
+        const double *A, const uint16_t k,
+        const double *B) {
+    (void)C; (void)m; (void)n; (void)A; (void)k; (void)B;
     cfm_die(__LINE__, "mm_d not implemented.");
 }
-
-#endif // if 0
 #else /* no __AVX2__ */
 /* If your CPU does not support AVX2 instructions then the multiplication 
  * between the two matrices will happen in the classic way.
  * Note: this can be optimized. */
-#define mm_base(A, B, C)        \
-    _Generic((A),               \
-            float: mm_base_f,   \
-            double: mm_base_d,  \
-            )(A, B, C)
-
 static void mm_base_f(float *__restrict__ C, uint16_t m, uint16_t n,
         const float *A, uint16_t k,
         const float *B) {
     // A[M][K], B[K][N], C[M][N]
     // u[M][K], v[K][N], C[M][N]
 #ifdef _OPENMP
-    #pragma omp parallel for collapse(2) num_threads(CFM_NTHREADS)
+    #pragma omp parallel for collapse(2) num_threads(cfm_num_threads)
 #endif  /* _OPENMP */
     for (uint16_t i = 0; i < m; ++i) {
         for (uint16_t j = 0; j < n; ++j) {
@@ -763,7 +787,7 @@ void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
 CFMDEF void cfm_tensor_matrix_vector_prod(const float *u_data, uint16_t m, uint16_t n,
         const float *v_data, float *t_data) {
 #ifdef _OPENMP
-    #pragma omp parallel for num_threads(CFM_NTHREADS)
+    #pragma omp parallel for num_threads(cfm_num_threads)
 #endif  /* _OPENMP */
     for (uint16_t i = 0; i < m; ++i) {
         float acc = 0.f;
@@ -779,7 +803,6 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
     if (u->dtype == CFM_FLOAT64 || v->dtype == CFM_FLOAT64) 
         cfm_die(__LINE__, "cfm_tensor_matmul can only perform matmul on CFM_FLOAT32 cfm_tensor for now.");
 
-    /* Both 1D cfm_tensor, dot product. */
     if (u->ndims == 1 && v->ndims == 1) return cfm_tensor_dot(name, u, v);
 
     uint16_t m;
@@ -795,9 +818,7 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         t_shape[0] = m; t_shape[1] = n;
         cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
 #ifdef __AVX2__
-        cfm_tensor_free(t);
-        cfm_die(__LINE__, "cfm_tensor_matmul AVX2 matmul not supported yet.");
-        // mm()
+        mm_f((float*)t->data, m, n, (float*)u->data, k, (float*)v->data);
 #else
         mm_base_f((float*)t->data, m, n, (float*)u->data, k, (float*)v->data);
 #endif /* __AVX2__ */
@@ -813,9 +834,7 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         t_shape[0] = m; t_shape[1] = n;
         cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
 #ifdef __AVX2__
-        cfm_tensor_free(t);
-        cfm_die(__LINE__, "cfm_tensor_matmul AVX2 matmul not supported yet.");
-        // mm()
+        mm_f((float*)t->data, m, n, (float*)u_expanded->data, k, (float*)v->data);
 #else
         mm_base_f((float*)t->data, m, n, (float*)u_expanded->data, k, (float*)v->data);
 #endif /* __AVX2__ */
