@@ -762,13 +762,18 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
     /* Both 1D cfm_tensor, dot product. */
     if (u->ndims == 1 && v->ndims == 1) return cfm_tensor_dot(name, u, v);
 
-    /* Both 2D cfm_tensor, matrix-matrix product. Note: efficient matmul implemented in mm/mm.c */
+    uint16_t m;
+    uint16_t n;
+    uint16_t k;
+    uint16_t t_shape[2] = {0};
+
+    /* Both 2D cfm_tensor, matrix-matrix product. */
     if (u->ndims == 2 && v->ndims == 2) {
         if (u->shape[1] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
-        uint16_t m = u->shape[0];
-        uint16_t n = v->shape[1];
-        uint16_t k = v->shape[0];
-        uint16_t t_shape[2] = {m, n};
+        m = u->shape[0];
+        n = v->shape[1];
+        k = v->shape[0];
+        t_shape[0] = m; t_shape[1] = n;
         cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
 #ifdef __AVX2__
         cfm_tensor_free(t);
@@ -777,6 +782,26 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
 #else
         mm_base_f((float*)t->data, m, n, (float*)u->data, k, (float*)v->data);
 #endif /* __AVX2__ */
+        return t;
+    }
+
+    /* First cfm_tensor 1D and second cfm_tensor 2D */
+    if (u->ndims == 1 && v->ndims == 2) {
+        if (u->shape[0] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
+        cfm_tensor *u_expanded = cfm_tensor_expand(u, 2, ((uint16_t[]){1, u->shape[0]})); // from shape[3] to shape[1, 3]
+        m = 1;
+        n = v->shape[1];
+        k = v->shape[0];
+        t_shape[0] = m; t_shape[1] = n;
+        cfm_tensor *t = cfm_tensor_new(name, u->dtype, 2, t_shape);
+#ifdef __AVX2__
+        cfm_tensor_free(t);
+        cfm_die(__LINE__, "cfm_tensor_matmul AVX2 matmul not supported yet.");
+        // mm()
+#else
+        mm_base_f((float*)t->data, m, n, (float*)u_expanded->data, k, (float*)v->data);
+#endif /* __AVX2__ */
+        cfm_tensor_free(u_expanded);
         return t;
     }
 
