@@ -16,8 +16,15 @@
 #endif /* _OPENMP */
 
 static int cfm_num_threads = 1;
+
 void cfm_set_num_threads(int n) {
-    cfm_num_threads = n;
+#ifdef _OPENMP
+    int max_threads = omp_get_max_threads();
+    cfm_num_threads = (n > 0 && n <= max_threads) ? n : max_threads;
+#else
+    (void)n;
+    cfm_num_threads = 1;
+#endif
 }
 
 int cfm_get_num_threads(void) {
