@@ -6,7 +6,7 @@
 int main(void) {
     srand(time(NULL));
     
-    cfm_tensor *A = cfm_tensor_full("A", CFM_FLOAT32, 2, ((uint16_t[]){3, 3}), 3.f);
+    cfm_tensor *A = cfm_tensor_full("A", CFM_FLOAT32, 1, ((uint16_t[]){3}), 3.f);
     cfm_tensor *B = cfm_tensor_full("B", CFM_FLOAT32, 2, ((uint16_t[]){3, 3}), 3.f);
 
     cfm_tensor_print(A, 2);
