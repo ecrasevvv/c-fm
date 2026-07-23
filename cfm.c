@@ -9,7 +9,11 @@
 
 #ifdef __AVX2__
 #include <immintrin.h>
-#endif
+#endif /* __AVX2__ */
+
+#ifdef _OPENMP
+#define CFM_NTHREADS 12
+#endif /* _OPENMP */
 
 #ifndef CFM_FREE
 #define CFM_FREE free
@@ -26,11 +30,11 @@
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
-#endif 
+#endif /* M_PI */
 
 #ifndef _2_M_PI
 #define _2_M_PI (M_PI*2.0)
-#endif
+#endif /* _2_M_PI */
 
 #define CFM_EPS_FLOAT32 (1e-10f)
 #define CFM_EPS_FLOAT64 ( 1e-10)
@@ -253,7 +257,7 @@ cfm_tensor *cfm_tensor_ones(const char *name, cfm_dtype dtype,
 }
 
 /* This function returns the element in the position specified by idx from a given cfm_tensor t. */
-CFMDEF double cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
+CFMDEF float cfm_tensor_get_element(const cfm_tensor *t, uint64_t idx) {
     return (t->dtype == CFM_FLOAT32) ? ((float*)t->data)[idx] : ((double*)t->data)[idx];
 }
 
@@ -702,8 +706,7 @@ static void kernel_16x6d(double *A_start, double *B_start, double *__restrict__ 
 static void mm_f(float *A, float *B, float *__restrict__ C) {
     // A[M][K], B[K][N], C[M][N]
 #ifdef _OPENMP
-#define NTHREADS 12
-    #pragma omp parallel for collapse(2) num_threads(NTHREADS)
+    #pragma omp parallel for collapse(2) num_threads(CFM_NTHREADS)
 #endif  /* _OPENMP */
     for (size_t i = 0; i < M; i+=MR) {
         for (size_t j = 0; j < N; j+=NR) {
@@ -733,8 +736,7 @@ static void mm_base_f(float *__restrict__ C, uint16_t m, uint16_t n,
     // A[M][K], B[K][N], C[M][N]
     // u[M][K], v[K][N], C[M][N]
 #ifdef _OPENMP
-#define NTHREADS 12
-    #pragma omp parallel for collapse(2) num_threads(NTHREADS)
+    #pragma omp parallel for collapse(2) num_threads(CFM_NTHREADS)
 #endif  /* _OPENMP */
     for (uint16_t i = 0; i < m; ++i) {
         for (uint16_t j = 0; j < n; ++j) {
@@ -754,6 +756,24 @@ void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
 }
 #endif /* __AVX2__ */
 
+/* This function computes the matrix-vector product between data of cfm_tensor u (matrix)
+ * and data of cfm_tensor v (vector). The result is stored in data of cfm_tensor t (vector).
+ * Note: cfm_tensor_get_element() can be used to retrive v_data[j] element but this implies to pass
+ *       the entire tensor v to the function. */
+CFMDEF void cfm_tensor_matrix_vector_prod(const float *u_data, uint16_t m, uint16_t n,
+        const float *v_data, float *t_data) {
+#ifdef _OPENMP
+    #pragma omp parallel for num_threads(CFM_NTHREADS)
+#endif  /* _OPENMP */
+    for (uint16_t i = 0; i < m; ++i) {
+        float acc = 0.f;
+        for (uint16_t j = 0; j < n; ++j) {
+            acc += u_data[IDX(i,n,j)] * v_data[j];
+        }
+        t_data[i] = acc;
+    }
+}
+
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v) {
     if (u->dtype == CFM_FLOAT64 || v->dtype == CFM_FLOAT64) 
@@ -767,7 +787,6 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
     uint16_t k;
     uint16_t t_shape[2] = {0};
 
-    /* Both 2D cfm_tensor, matrix-matrix product. */
     if (u->ndims == 2 && v->ndims == 2) {
         if (u->shape[1] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
         m = u->shape[0];
@@ -785,10 +804,9 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         return t;
     }
 
-    /* First cfm_tensor 1D and second cfm_tensor 2D */
     if (u->ndims == 1 && v->ndims == 2) {
         if (u->shape[0] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
-        cfm_tensor *u_expanded = cfm_tensor_expand(u, 2, ((uint16_t[]){1, u->shape[0]})); // from shape[3] to shape[1, 3]
+        cfm_tensor *u_expanded = cfm_tensor_expand(u, 2, ((uint16_t[]){1, u->shape[0]}));
         m = 1;
         n = v->shape[1];
         k = v->shape[0];
@@ -802,6 +820,13 @@ cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         mm_base_f((float*)t->data, m, n, (float*)u_expanded->data, k, (float*)v->data);
 #endif /* __AVX2__ */
         cfm_tensor_free(u_expanded);
+        return t;
+    }
+
+    if (u->ndims == 2 && v->ndims == 1) {
+        if (u->shape[1] != v->shape[0]) cfm_die(__LINE__, "cfm_tensor_matmul incompatible inner dimensions.");
+        cfm_tensor *t = cfm_tensor_zeros(name, u->dtype, 1, ((uint16_t[]){u->shape[0]}));
+        cfm_tensor_matrix_vector_prod((float*)u->data, u->shape[0], u->shape[1], (float*)v->data, (float*)t->data);
         return t;
     }
 
