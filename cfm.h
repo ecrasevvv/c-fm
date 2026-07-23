@@ -142,6 +142,12 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
         const cfm_tensor *v);
 
+/* This function set the number of threads used by OpenMP parallel ops. Defaults to 1. */
+void cfm_set_num_threads(int n);
+
+/* This function returns the number of threads setted for OpenMP. */
+int cfm_get_num_threads(void);
+
 /* This function prints out the cfm_tensor t in the pytorch style. */
 void cfm_tensor_print(const cfm_tensor *t, int precision);
 
