@@ -651,103 +651,124 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
 #define IDX(row, cols, col) (((row)*(cols))+(col))
 
 #ifdef __AVX2__
-/* This is a fast matmul implementation done with AVX2 instructions that 
- * achieves the same performance as numpy in terms of GFLOPS (see ./mm/mm.c for more details).
+/* This is a fast matmul implementation done with AVX2 instructions that
+ * archieves the same performance as numpy in terms of GFLOPS (see ./mm/mm.c for more details).
+ * Note that ./mm/mm.c is written for col-major matrices. This kernel instead was written like the one present
+ * in ./mm/mm_row.c since cfm_tensor->data are row-major matrices.
  * Note that this is optimized for my CPU since the project is meant to be an educational project for me,
  * this means that the results and behavior on other CPUs are unknown to me.
- * Feel free to read ./mm/mm.c to explore in details the fast matmul implementation, try other micro-kernels
+ * Feel free to read ./mm/mm.c and ./mm/mm_row.c to explore in details the fast matmul implementation, try other micro-kernels
  * and run the benchmark on your CPU. */
 
-/* Row-major matrix multiply using AVX2: transposes A and B to column-major, runs the 16x6 kernel, 
- * then transposes C back to row-major.
- *
- * To make thing works with the studyied and implemented fast matmul in ./mm/mm.c  the matrices needs to be
- * transposed since cfm_tensor->data is row-major but the fast matmul micro-kernel(s) uses col-major indexing. 
- * Im too lazy to re-write a kernel for the row-major order cfm_tensor->data matrices so we just pay the 
- * overhead that is okay for small matrices used in a simple 2D Flow Matching project like mine. */
-#define CFM_MR 16
-#define CFM_NR 6
-/* 16x6 AVX2 micro-kernel. Computes a 16x6 tile of C_col (col-major) from
- * column-major A_col and B_col slices. Identical FMA logic to mm/mm.c. */
+/* Row-major 6×16 AVX2 kernel — identical FMA logic to ./mm/mm_row.c. A is row-major [M×K], B is row-major [K×N],
+ * C is row-major [M×N]. The kernel broadcasts A scalars and loads contiguous B row-slices. */
+#define CFM_MR 6
+#define CFM_NR 16
 __attribute__((noinline))
-static void kernel_16x6f(float *__restrict__ C_col, const uint16_t mp,
-        const float *A_col, const uint16_t k,
-        const float *B_col) {
+static void kernel_6x16(const float *A_start, const uint16_t k,
+        const float *B_start, const uint16_t n,
+        float *__restrict__ C_start) {
     __m256 acc[6][2] = {};
-    __m256 b_broadcast;
-    __m256 a0;
-    __m256 a1;
+    __m256 a_broadcast;
+    __m256 b0, b1;
 
     for (size_t p = 0; p < k; ++p) {
-        a0 = _mm256_loadu_ps(&A_col[p * mp]);
-        a1 = _mm256_loadu_ps(&A_col[p * mp + 8]);
+        b0 = _mm256_loadu_ps(&B_start[p * n]);
+        b1 = _mm256_loadu_ps(&B_start[p * n + 8]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[p]);
-        acc[0][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[0][0]);
-        acc[0][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[0][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[p]);
+        acc[0][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[0][0]);
+        acc[0][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[0][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[1 * k + p]);
-        acc[1][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[1][0]);
-        acc[1][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[1][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[1 * k + p]);
+        acc[1][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[1][0]);
+        acc[1][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[1][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[2 * k + p]);
-        acc[2][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[2][0]);
-        acc[2][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[2][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[2 * k + p]);
+        acc[2][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[2][0]);
+        acc[2][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[2][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[3 * k + p]);
-        acc[3][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[3][0]);
-        acc[3][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[3][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[3 * k + p]);
+        acc[3][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[3][0]);
+        acc[3][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[3][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[4 * k + p]);
-        acc[4][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[4][0]);
-        acc[4][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[4][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[4 * k + p]);
+        acc[4][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[4][0]);
+        acc[4][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[4][1]);
 
-        b_broadcast = _mm256_broadcast_ss(&B_col[5 * k + p]);
-        acc[5][0] = _mm256_fmadd_ps(a0, b_broadcast, acc[5][0]);
-        acc[5][1] = _mm256_fmadd_ps(a1, b_broadcast, acc[5][1]);
+        a_broadcast = _mm256_broadcast_ss(&A_start[5 * k + p]);
+        acc[5][0] = _mm256_fmadd_ps(a_broadcast, b0, acc[5][0]);
+        acc[5][1] = _mm256_fmadd_ps(a_broadcast, b1, acc[5][1]);
     }
 
-    for (size_t j = 0; j < 6; ++j) {
-        _mm256_storeu_ps(&C_col[j * mp    ], acc[j][0]);
-        _mm256_storeu_ps(&C_col[j * mp + 8], acc[j][1]);
+    for (size_t r = 0; r < 6; ++r) {
+        _mm256_storeu_ps(&C_start[r * n    ], acc[r][0]);
+        _mm256_storeu_ps(&C_start[r * n + 8], acc[r][1]);
     }
 }
 
-CFMDEF void cfm_matrix_transpose(float *dst, uint16_t p_cols,
-        const float *src, uint16_t rows, uint16_t cols, uint16_t ld) {
-    for (uint16_t r = 0; r < rows; r++)
-        for (uint16_t c = 0; c < cols; c++)
-            dst[c * p_cols + r] = src[r * ld + c];
+/* Pad rows of A to a multiple of CFM_MR. A is [m][k] row-major. */
+static float *pad_a_rows(const float *src, uint16_t m, uint16_t k, uint16_t *mp) {
+    uint16_t add = (m % CFM_MR) ? CFM_MR - (m % CFM_MR) : 0;
+    *mp = m + add;
+    if (!add) return NULL;
+    printf("row pad needed\n");
+    float *dst = calloc((*mp) * k, sizeof(float));
+    if (!dst) cfm_die(__LINE__, "Out of memory");
+    memcpy(dst, src, m * k * sizeof(float));
+    return dst;
+}
+
+/* Pad columns of B to a multiple of CFM_NR. B is [k][n] row-major. */
+static float *pad_b_cols(const float *src, uint16_t k, uint16_t n, uint16_t *np) {
+    uint16_t add = (n % CFM_NR) ? CFM_NR - (n % CFM_NR) : 0;
+    *np = n + add;
+    if (!add) return NULL;
+    printf("col pad needed\n");
+    float *dst = calloc(k * (*np), sizeof(float));
+    if (!dst) cfm_die(__LINE__, "Out of memory");
+    for (uint16_t r = 0; r < k; r++)
+        memcpy(&dst[r * (*np)], &src[r * n], n * sizeof(float));
+    return dst;
 }
 
 static void mm_f(float *__restrict__ C, const uint16_t m, const uint16_t n,
         const float *A, const uint16_t k,
         const float *B) {
-    uint16_t mp = (m % CFM_MR) ? m + CFM_MR - (m % CFM_MR) : m;
-    uint16_t np = (n % CFM_NR) ? n + CFM_NR - (n % CFM_NR) : n;
+    uint16_t mp, np;
+    float *A_pad = pad_a_rows(A, m, k, &mp);
+    float *B_pad = pad_b_cols(B, k, n, &np);
 
-    float *AT = calloc(k * mp, sizeof(float));
-    if (!AT) cfm_die(__LINE__, "Out of memory");
-    cfm_matrix_transpose(AT, mp, A, m, k, k);
+    const float *Aa = A_pad ? A_pad : A;
+    const float *Bb = B_pad ? B_pad : B;
+    uint16_t mp_use = A_pad ? mp : m;
+    uint16_t np_use = B_pad ? np : n;
 
-    float *BT = calloc(np * k, sizeof(float));
-    if (!BT) cfm_die(__LINE__, "Out of memory");
-    cfm_matrix_transpose(BT, k, B, k, n, n);
-
-    float *CT = calloc(np * mp, sizeof(float));
-    if (!CT) cfm_die(__LINE__, "Out of memory");
+    float *C_pad = NULL;
+    float *Cc = C;
+    if (A_pad || B_pad) {
+        C_pad = calloc(mp_use * np_use, sizeof(float));
+        if (!C_pad) cfm_die(__LINE__, "Out of memory");
+        Cc = C_pad;
+    }
 
 #ifdef _OPENMP
     #pragma omp parallel for collapse(2) num_threads(cfm_num_threads)
 #endif
-    for (size_t i = 0; i < mp; i += CFM_MR) {
-        for (size_t j = 0; j < np; j += CFM_NR) {
-            kernel_16x6f(&CT[j * mp + i], mp, &AT[i], k, &BT[j * k]);
+    for (size_t i = 0; i < mp_use; i += CFM_MR) {
+        for (size_t j = 0; j < np_use; j += CFM_NR) {
+            kernel_6x16(&Aa[i * k], k, &Bb[j], np_use, &Cc[i * np_use + j]);
         }
     }
-    cfm_matrix_transpose(C, n, CT, n, m, mp);
 
-    free(AT); free(BT); free(CT);
+    if (C_pad) {
+        for (uint16_t i = 0; i < m; i++) {
+            memcpy(&C[i * n], &C_pad[i * np_use], n * sizeof(float));
+        }
+        free(C_pad);
+    }
+
+    free(A_pad); free(B_pad);
 }
 
 /* Note: remove it later. */
@@ -782,6 +803,12 @@ static void mm_base_f(float *__restrict__ C, uint16_t m, uint16_t n,
             }
         }
     }
+}
+
+/* Note: remove it later. */
+void mm_base_f_wrapper(float *__restrict__ C, const uint16_t m, const uint16_t n,
+        const float *A, const uint16_t k, const float *B) {
+    mm_base_f(C, m, n, A, k, B);
 }
 
 /* re-add static, -Wunused-function suppression */
