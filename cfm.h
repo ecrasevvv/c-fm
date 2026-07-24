@@ -154,4 +154,9 @@ void cfm_tensor_print(const cfm_tensor *t, int precision);
 /* This function prints out the cfm_tensor t whitout any fancy style formatting. */
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision);
 
+/* This function is a wrapper arond the mm_f function that makes mm_f accessible
+ * for benchmarking in bench/bench.c 
+ * Note: remove later. */
+void mm_f_wrapper(float *__restrict__ C, const uint16_t m, const uint16_t n,
+        const float *A, const uint16_t k, const float *B);
 #endif
