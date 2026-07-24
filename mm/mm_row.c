@@ -40,7 +40,7 @@
 #endif
 
 #ifndef NTHREADS
-#define NTHREADS 1
+#define NTHREADS 12
 #endif
 
 /* Row-major indexing */
@@ -137,6 +137,9 @@ static ARR_TYPE *pad_cols_rm(const ARR_TYPE *src, size_t rows, size_t cols_raw,
 void mm(const ARR_TYPE *A, const size_t m, const size_t k,
         const ARR_TYPE *B, const size_t n,
         ARR_TYPE *__restrict__ C) {
+#ifdef _OPENMP
+#pragma omp parallel for collapse(2) num_threads(NTHREADS)
+#endif
     for (size_t i = 0; i < m; i+=MR) {
         for (size_t j = 0; j < n; j+=NR) {
             kernel_6x16(&A[i * k], k, &B[j], n, &C[i * n + j]);
