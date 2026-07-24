@@ -648,7 +648,7 @@ cfm_tensor *cfm_tensor_dot(const char *name, const cfm_tensor *u,
 }
 
 /* Row-major indexing */
-#define IDX(row, cols, col) (((row)*cols)+(col))
+#define IDX(row, cols, col) (((row)*(cols))+(col))
 
 #ifdef __AVX2__
 /* This is a fast matmul implementation done with AVX2 instructions that 
@@ -748,6 +748,12 @@ static void mm_f(float *__restrict__ C, const uint16_t m, const uint16_t n,
     cfm_matrix_transpose(C, n, CT, n, m, mp);
 
     free(AT); free(BT); free(CT);
+}
+
+/* Note: remove it later. */
+void mm_f_wrapper(float *__restrict__ C, const uint16_t m, const uint16_t n,
+        const float *A, const uint16_t k, const float *B) {
+    mm_f(C, m, n, A, k, B);
 }
 
 /* re-add static, -Wunused-function suppression */
