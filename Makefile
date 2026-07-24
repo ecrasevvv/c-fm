@@ -14,11 +14,11 @@ NATIVE_CPU_FLAG=-march=native
 BENCH_O=-O3
 DEBUG_O=-O0
 
-BENCH_CFLAGS=$(BENCH_O) $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c99
-BENCH_MULTITHREAD_CFLAGS=$(BENCH_O) $(NATIVE_CPU_FLAG) -fopenmp -Wall -Wextra -std=c99
+BENCH_CFLAGS=$(BENCH_O) $(NATIVE_CPU_FLAG) -Wall -Wextra
+BENCH_MULTITHREAD_CFLAGS=$(BENCH_O) $(NATIVE_CPU_FLAG) -fopenmp -Wall -Wextra
 
-DEBUG_CFLAGS=$(DEBUG_O) -DDEBUG -Wall -Wextra -std=c99 -g
-DEBUG_MULTITHREAD_CFLAGS=$(DEBUG_O) -DDEBUG -fopenmp -Wall -Wextra -std=c99 -g
+DEBUG_CFLAGS=$(DEBUG_O) -DDEBUG -Wall -Wextra -g
+DEBUG_MULTITHREAD_CFLAGS=$(DEBUG_O) -DDEBUG -fopenmp -Wall -Wextra -g
 
 LDLIBS=-lm
 
