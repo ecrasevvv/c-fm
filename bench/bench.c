@@ -23,19 +23,28 @@ int main(void) {
     printf("NTHREADS: %d\n", cfm_get_num_threads());
     srand(time(NULL));
     
-    cfm_tensor *A = cfm_tensor_rand("A", CFM_FLOAT32, 2, ((uint16_t[]){512, 512}));
-    cfm_tensor *B = cfm_tensor_rand("B", CFM_FLOAT32, 2, ((uint16_t[]){512, 512}));
+    cfm_tensor *A = cfm_tensor_rand("A", CFM_FLOAT32, 2, ((uint16_t[]){528, 256}));
+    cfm_tensor *B = cfm_tensor_rand("B", CFM_FLOAT32, 2, ((uint16_t[]){256, 528}));
 
     uint16_t m = A->shape[0];
     uint16_t n = B->shape[1];
     uint16_t k = B->shape[0];
 
-    /* warmup */
+    float *A_data = A->data;
+    float *B_data = B->data;
+
     cfm_tensor *C = cfm_tensor_zeros("C", CFM_FLOAT32, 2,
             ((uint16_t[]){A->shape[0], B->shape[1]}));
+    float *__restrict__ C_data = C->data;
+
+    /* warmup */
     for (size_t i = 0; i < W_NITER; ++i) {
         memset(C->data, 0.0, C->numel*sizeof(float));
-        mm_f_wrapper((float*)C->data, m, n, (float*)A->data, k, (float*)B->data);
+#ifdef __AVX2__
+        mm_f_wrapper(C_data, m, n, A_data, k, B_data);
+#else
+        mm_base_f_wrapper(C_data, m, n, A_data, k, B_data);
+#endif
     }
     
     /* Evaluation metrics */
@@ -49,7 +58,11 @@ int main(void) {
     for (size_t i = 0; i < NITER; ++i) {
         memset(C->data, 0.0, C->numel*sizeof(float));
         clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-        mm_f_wrapper((float*)C->data, m, n, (float*)A->data, k, (float*)B->data);
+#ifdef __AVX2__
+        mm_f_wrapper(C_data, m, n, A_data, k, B_data);
+#else
+        mm_base_f_wrapper(C_data, m, n, A_data, k, B_data);
+#endif
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         
         double time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)*1e-9;
