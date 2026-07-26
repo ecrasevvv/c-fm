@@ -1,8 +1,7 @@
 cfm.sh
 cfm.md
 test.c
-quantize/
-llama.cpp/
-STREAM/
-fm.py
-models/
+quantize/*
+llama.cpp/*
+STREAM/*
+fm_py/*
