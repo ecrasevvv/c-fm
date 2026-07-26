@@ -712,7 +712,6 @@ static float *pad_a_rows(const float *src, uint16_t m, uint16_t k, uint16_t *mp)
     uint16_t add = (m % CFM_MR) ? CFM_MR - (m % CFM_MR) : 0;
     *mp = m + add;
     if (!add) return NULL;
-    printf("row pad needed\n");
     float *dst = calloc((*mp) * k, sizeof(float));
     if (!dst) cfm_die(__LINE__, "Out of memory");
     memcpy(dst, src, m * k * sizeof(float));
@@ -724,7 +723,6 @@ static float *pad_b_cols(const float *src, uint16_t k, uint16_t n, uint16_t *np)
     uint16_t add = (n % CFM_NR) ? CFM_NR - (n % CFM_NR) : 0;
     *np = n + add;
     if (!add) return NULL;
-    printf("col pad needed\n");
     float *dst = calloc(k * (*np), sizeof(float));
     if (!dst) cfm_die(__LINE__, "Out of memory");
     for (uint16_t r = 0; r < k; r++)
@@ -735,6 +733,19 @@ static float *pad_b_cols(const float *src, uint16_t k, uint16_t n, uint16_t *np)
 static void mm_f(float *__restrict__ C, const uint16_t m, const uint16_t n,
         const float *A, const uint16_t k,
         const float *B) {
+    /* Skip all the unnecessary checks if m and n are compatibles with CFM_MR and CFM_NR. */
+    if (m%CFM_MR == 0 && n%CFM_NR == 0) {
+#ifdef _OPENMP
+#pragma omp parallel for collapse(2) num_threads(cfm_num_threads)
+#endif
+        for (size_t i = 0; i < m; i += CFM_MR) {
+            for (size_t j = 0; j < n; j += CFM_NR) {
+                kernel_6x16(&A[i * k], k, &B[j], n, &C[i * n + j]);
+            }
+        }
+        return;
+    }
+
     uint16_t mp, np;
     float *A_pad = pad_a_rows(A, m, k, &mp);
     float *B_pad = pad_b_cols(B, k, n, &np);
@@ -824,18 +835,49 @@ void mm_base_d(double *__restrict__ C, uint16_t m, uint16_t n,
  * and data of cfm_tensor v (vector). The result is stored in data of cfm_tensor t (vector).
  * Note: cfm_tensor_get_element() can be used to retrive v_data[j] element but this implies to pass
  *       the entire tensor v to the function. */
-CFMDEF void cfm_tensor_matrix_vector_prod(const float *u_data, uint16_t m, uint16_t n,
+CFMDEF void cfm_tensor_matrix_vector_prod(const float *u_data, uint16_t m, uint16_t k,
         const float *v_data, float *t_data) {
 #ifdef _OPENMP
     #pragma omp parallel for num_threads(cfm_num_threads)
 #endif  /* _OPENMP */
     for (uint16_t i = 0; i < m; ++i) {
-        float acc = 0.f;
-        for (uint16_t j = 0; j < n; ++j) {
-            acc += u_data[IDX(i,n,j)] * v_data[j];
+        uint16_t j = 0;
+        /* Compute */
+#ifdef __AVX2__
+        __m256 acc = _mm256_setzero_ps();
+        for (; j < k; j+=8) {
+            __m256 u_vec = _mm256_loadu_ps(&u_data[IDX(i,k,j)]);
+            __m256 v_vec = _mm256_loadu_ps(&v_data[j]);
+            acc = _mm256_fmadd_ps(u_vec, v_vec, acc);
         }
+#else
+        float acc = 0.f;
+        for (; j < k; ++j) {
+            acc += u_data[IDX(i,k,j)] * v_data[j];
+        }
+#endif  /* __AVX2__ */
+        /* Store */
+#ifdef __AVX2__
+        __m128 acc_lo = _mm256_extractf128_ps(acc, 0); 
+        __m128 acc_hi = _mm256_extractf128_ps(acc, 1); 
+        __m128 sum = _mm_add_ps(acc_lo, acc_hi);
+        sum = _mm_hadd_ps(sum, sum);
+        sum = _mm_hadd_ps(sum, sum);
+        t_data[i] = _mm_cvtss_f32(sum);
+#else
         t_data[i] = acc;
+#endif  /* __AVX2__ */
+        /* Reminders in case n%8 != 0 */
+        for (uint16_t p = j; p < k; ++p) {
+            t_data[i] += u_data[IDX(i,k,p)] * v_data[p];
+        }
     }
+}
+
+/* Note: remove it later. */
+void cfm_tensor_matrix_vector_prod_wrapper(const float *u_data, uint16_t m, uint16_t k,
+        const float *v_data, float *t_data) {
+    cfm_tensor_matrix_vector_prod(u_data, m, k, v_data, t_data);
 }
 
 cfm_tensor *cfm_tensor_matmul(const char *name, const cfm_tensor *u,
