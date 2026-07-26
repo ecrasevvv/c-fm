@@ -154,11 +154,14 @@ void cfm_tensor_print(const cfm_tensor *t, int precision);
 /* This function prints out the cfm_tensor t whitout any fancy style formatting. */
 void cfm_tensor_print_raw(const cfm_tensor *t, cfm_print_mode pm, int precision);
 
-/* These functions are wrappers around mm_f and mm_base_f used to benchmark the 
- * performance of cfm_tensor_matmul in ./bench/bench.c skipping cfm_tensor_matmul function call.
+/* These functions are wrappers around all the internal functions (like mm_f, mm_base_f, etc.)
+ * used to benchmark the performance of cfm_tensor_matmul with cfm_tensors of various shape
+ * combinations. These wrappers remove a bit of overhead.
  * Note: remove these later. */
 void mm_f_wrapper(float *__restrict__ C, const uint16_t m, const uint16_t n,
         const float *A, const uint16_t k, const float *B);
 void mm_base_f_wrapper(float *__restrict__ C, const uint16_t m, const uint16_t n,
         const float *A, const uint16_t k, const float *B);
+void cfm_tensor_matrix_vector_prod_wrapper(const float *u_data, uint16_t m, uint16_t n,
+        const float *v_data, float *t_data);
 #endif
